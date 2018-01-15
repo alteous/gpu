@@ -5,9 +5,11 @@ use std::{ffi, fs, io, path};
 
 use graphics::buffer::Format;
 
-use glutin::{Api, GlContext, GlRequest};
-use glutin::Event::WindowEvent;
-use glutin::WindowEvent::Closed;
+use glutin::ElementState::Released;
+use glutin::Event;
+use glutin::GlContext;
+use glutin::VirtualKeyCode as Key;
+use glutin::WindowEvent;
 
 #[repr(C)]
 struct Vertex {
@@ -46,7 +48,7 @@ fn main() {
     let mut event_loop = glutin::EventsLoop::new();
     let window_builder = glutin::WindowBuilder::new();
     let context_builder = glutin::ContextBuilder::new()
-        .with_gl(GlRequest::Specific(Api::OpenGl, (3, 2)))
+        .with_gl(glutin::GL_CORE)
         .with_vsync(true)
         .with_multisampling(4);
     let window = glutin::GlWindow::new(
@@ -109,7 +111,20 @@ fn main() {
         factory.draw(&vertex_array, 0 .. 3, &invocation);
         event_loop.poll_events(|event| {
             match event {
-                WindowEvent { event: Closed, .. } => running = false,
+                Event::WindowEvent { event, .. } => {
+                    match event {
+                        WindowEvent::Closed => running = false,
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            match (input.virtual_keycode, input.state) {
+                                (Some(Key::Escape), Released) => {
+                                    running = false;
+                                },
+                                _ => {},
+                            }
+                        },
+                        _ => {}
+                    }
+                },
                 _ => {}
             }
         });

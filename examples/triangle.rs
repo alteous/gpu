@@ -57,8 +57,9 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let gl = graphics::init(|sym| window.get_proc_address(sym) as *const _);
-    let factory = graphics::Factory::new(gl);
+    let factory = graphics::Factory::new(|sym| {
+        window.get_proc_address(sym) as *const _
+    });
 
     let vertex_shader = {
         let mut source = read_file_to_end("triangle.vs").unwrap();

@@ -5,9 +5,13 @@ use std::{cmp, ffi, fmt, hash, ops};
 use std::sync::{self, mpsc};
 
 use buffer::Buffer;
+use texture::Sampler;
 
 /// Specifies the maximum number of uniforms permitted by the crate.
 pub const MAX_UNIFORMS: usize = 4;
+
+/// Specifies the maximum number of samplers permitted by the crate.
+pub const MAX_SAMPLERS: usize = 4;
 
 /// The program source code type.
 pub type Source = ffi::CStr;
@@ -78,7 +82,7 @@ pub struct Object {
     kind: Kind,
 
     /// Returns the object back to the factory upon destruction.
-    destructor: sync::Arc<ObjectDestructor>,
+    _destructor: sync::Arc<ObjectDestructor>,
 }
 
 impl Object {
@@ -89,7 +93,7 @@ impl Object {
         tx: mpsc::Sender<Destroyed>,
     ) -> Self {
         Self {
-            destructor: sync::Arc::new(
+            _destructor: sync::Arc::new(
                 ObjectDestructor {
                     id,
                     tx,
@@ -136,6 +140,9 @@ pub struct Invocation<'a> {
 
     /// Uniform buffers to be bound to the program at draw time.
     pub uniforms: [Option<Buffer>; MAX_UNIFORMS],
+
+    /// Texture samplers to be bound to the program at draw time.
+    pub samplers: [Option<Sampler>; MAX_SAMPLERS],
 }
 
 /// A compiled shader program.
@@ -144,7 +151,7 @@ pub struct Program {
     id: u32,
 
     /// Returns the program back to the factory upon destruction.
-    destructor: sync::Arc<ProgramDestructor>,
+    _destructor: sync::Arc<ProgramDestructor>,
 }
 
 impl Program {
@@ -154,7 +161,7 @@ impl Program {
         tx: mpsc::Sender<Destroyed>,
     ) -> Self {
         Self {
-            destructor: sync::Arc::new(
+            _destructor: sync::Arc::new(
                 ProgramDestructor {
                     id,
                     tx,

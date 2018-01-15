@@ -1,6 +1,7 @@
 extern crate glutin;
 extern crate graphics;
 
+use graphics::gl;
 use std::{ffi, fs, io, path};
 
 use graphics::buffer::Format;
@@ -33,6 +34,16 @@ const YELLOW: &'static [UniformBlock] = &[
     UniformBlock { color: [1.0, 1.0, 0.0, 1.0] },
 ];
 
+const GREEN_PIXEL: &'static [[u8; 4]] = &[
+    [0, 255, 0, 255],
+];
+
+fn cstr<'a, T>(bytes: &'a T) -> &'a ffi::CStr
+    where T: AsRef<[u8]>
+{
+    ffi::CStr::from_bytes_with_nul(bytes.as_ref()).expect("missing NUL byte")
+}
+
 fn read_file_to_end<P>(path: P) -> io::Result<Vec<u8>>
     where P: AsRef<path::Path>
 {
@@ -64,47 +75,62 @@ fn main() {
     let vertex_shader = {
         let mut source = read_file_to_end("triangle.vs").unwrap();
         source.push(0);
-        let cstr = ffi::CStr::from_bytes_with_nul(&source).unwrap();
         factory.program_object(
             graphics::program::Kind::Vertex,
-            cstr,
+            cstr(&source),
         )
     };
     let fragment_shader = {
         let mut source = read_file_to_end("triangle.fs").unwrap();
         source.push(0);
-        let cstr = ffi::CStr::from_bytes_with_nul(&source).unwrap();
         factory.program_object(
             graphics::program::Kind::Fragment,
-            cstr,
+            cstr(&source),
         )
     };
-    let (program, block_binding) = {
+    let (program, block_binding, sampler_binding) = {
         let prog = factory.program(
             &vertex_shader,
             &fragment_shader,
         );
-        let name = ffi::CStr::from_bytes_with_nul(b"UniformBlock\0").unwrap();
-        let binding = factory.query_uniform_block_index(&prog, name);
-        (prog, binding.unwrap() as usize)
+        let bname = cstr(b"UniformBlock\0");
+        let bbinding = factory.query_uniform_block_index(&prog, bname);
+        let sname = cstr(b"u_Sampler\0");
+        let sbinding = factory.query_uniform_index(&prog, sname);
+        (prog, bbinding.unwrap() as usize, sbinding.unwrap() as usize)
     };
 
     let vertex_buffer = factory.buffer(graphics::buffer::Kind::Array, graphics::buffer::Usage::StaticDraw);
-    factory.init(&vertex_buffer, TRIANGLE_DATA);
+    factory.initialize_buffer(&vertex_buffer, TRIANGLE_DATA);
 
     let uniform_buffer = factory.buffer(graphics::buffer::Kind::Uniform, graphics::buffer::Usage::DynamicDraw);
-    factory.init(&uniform_buffer, YELLOW);
+    factory.initialize_buffer(&uniform_buffer, YELLOW);
     
     let position_accessor = graphics::buffer::Accessor::new(vertex_buffer, POSITION_FORMAT, 0, 0);
     let mut vertex_array_builder = graphics::VertexArray::builder();
     vertex_array_builder.attributes.insert(0, position_accessor);
     let vertex_array = factory.vertex_array(vertex_array_builder);
-
+    
+    let texture = factory.texture2(Default::default());
+    factory.initialize_texture2(
+        &texture,
+        true,
+        gl::RGBA8,
+        1,
+        1,
+        gl::RGBA,
+        gl::UNSIGNED_BYTE,
+        GREEN_PIXEL,
+    );
+    let sampler = graphics::Sampler::from_texture2(texture);
+    
     let mut invocation = graphics::program::Invocation {
         program: &program,
         uniforms: [None, None, None, None],
+        samplers: [None, None, None, None],
     };
     invocation.uniforms[block_binding] = Some(uniform_buffer);
+    invocation.samplers[sampler_binding] = Some(sampler);
 
     let mut running = true;
     while running {

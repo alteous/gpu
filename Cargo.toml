@@ -1,5 +1,5 @@
 [package]
-name = "graphics"
+name = "gpu"
 version = "0.1.0"
 authors = ["David Harvey-Macaulay <alteous@outlook.com>"]
 

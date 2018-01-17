@@ -1,8 +1,8 @@
 //! GPU buffer management.
 
 use gl;
-use std::{cmp, fmt, hash, ops};
-use std::sync::{self, mpsc};
+use queue;
+use std::{cmp, fmt, hash, ops, sync};
 
 /// OpenGL buffer ID type.
 pub(crate) type Id = u32;
@@ -58,7 +58,7 @@ impl Usage {
 /// Pushes the buffer ID onto the factory buffer queue when destroyed.
 pub(crate) struct Destructor {
     id: Id,
-    tx: mpsc::Sender<Id>,
+    tx: queue::Sender<Id>,
 }
 
 impl ops::Drop for Destructor {
@@ -93,7 +93,7 @@ impl Buffer {
         kind: Kind,
         size: usize,
         usage: Usage,
-        tx: mpsc::Sender<Id>,
+        tx: queue::Sender<Id>,
     ) -> Self {
         Self {
             destructor: sync::Arc::new(Destructor { id, tx }),

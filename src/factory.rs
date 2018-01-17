@@ -6,46 +6,14 @@ use buffer;
 use gl;
 use program;
 use std::{ffi, mem, ops, os, ptr};
-use std::sync::mpsc;
 use texture;
 use vertex_array;
 
+use queue::Queue;
 use {Buffer, Program, Texture2, VertexArray};
 
-/// A thread-safe queue.
-struct Queue<T> {
-    /// Send half of queue.
-    tx: mpsc::Sender<T>,
-
-    /// Receive half of queue.
-    rx: mpsc::Receiver<T>,
-}
-
-impl<T> Queue<T> {
-    /// Constructor.
-    pub fn new() -> Self {
-        let (tx, rx) = mpsc::channel();
-        Self { tx, rx }
-    }
-
-    /// Clone the send half of the queue.
-    pub fn tx(&self) -> mpsc::Sender<T> {
-        self.tx.clone()
-    }
-
-    /// Remove the item from the front of the queue.
-    pub fn next(&self) -> Option<T> {
-        self.rx.try_recv().ok()
-    }
-}
-
-impl<T> Default for Queue<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// OpenGL memory manager.
+#[derive(Clone)]
 pub struct Factory {
     /// Function pointers to the OpenGL backend.
     gl: gl::Gl,

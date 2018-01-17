@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["David Harvey-Macaulay <alteous@outlook.com>"]
 
 [dependencies]
+crossbeam-channel = "0.1"
 glutin = "0.12"
 vec_map = "*"
 

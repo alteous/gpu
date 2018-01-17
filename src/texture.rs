@@ -1,8 +1,8 @@
 //! Texture2 objects.
 
 use gl;
-use std::{cmp, fmt, hash, ops};
-use std::sync::{self, mpsc};
+use queue;
+use std::{cmp, fmt, hash, ops, sync};
 
 /// OpenGL texture ID type.
 pub type Id = u32;
@@ -40,7 +40,7 @@ impl Wrap {
 /// Returns the texture back to the factory upon destruction.
 struct Destructor {
     id: Id,
-    tx: mpsc::Sender<Id>,
+    tx: queue::Sender<Id>,
 }
 
 impl ops::Drop for Destructor {
@@ -172,7 +172,7 @@ pub struct Texture2 {
 impl Texture2 {
     pub(crate) fn new(
         id: Id,
-        tx: mpsc::Sender<Id>,
+        tx: queue::Sender<Id>,
     ) -> Self {
         Texture2 {
             id,

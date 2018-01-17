@@ -1,10 +1,10 @@
 extern crate glutin;
-extern crate graphics;
+extern crate gpu;
 
-use graphics::gl;
+use gpu::gl;
 use std::{ffi, fs, io, path};
 
-use graphics::buffer::Format;
+use gpu::buffer::Format;
 
 use glutin::ElementState::Released;
 use glutin::Event;
@@ -68,7 +68,7 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let factory = graphics::Factory::new(|sym| {
+    let factory = gpu::Factory::new(|sym| {
         window.get_proc_address(sym) as *const _
     });
 
@@ -76,7 +76,7 @@ fn main() {
         let mut source = read_file_to_end("triangle.vs").unwrap();
         source.push(0);
         factory.program_object(
-            graphics::program::Kind::Vertex,
+            gpu::program::Kind::Vertex,
             cstr(&source),
         )
     };
@@ -84,7 +84,7 @@ fn main() {
         let mut source = read_file_to_end("triangle.fs").unwrap();
         source.push(0);
         factory.program_object(
-            graphics::program::Kind::Fragment,
+            gpu::program::Kind::Fragment,
             cstr(&source),
         )
     };
@@ -100,14 +100,14 @@ fn main() {
         (prog, bbinding.unwrap() as usize, sbinding.unwrap() as usize)
     };
 
-    let vertex_buffer = factory.buffer(graphics::buffer::Kind::Array, graphics::buffer::Usage::StaticDraw);
+    let vertex_buffer = factory.buffer(gpu::buffer::Kind::Array, gpu::buffer::Usage::StaticDraw);
     factory.initialize_buffer(&vertex_buffer, TRIANGLE_DATA);
 
-    let uniform_buffer = factory.buffer(graphics::buffer::Kind::Uniform, graphics::buffer::Usage::DynamicDraw);
+    let uniform_buffer = factory.buffer(gpu::buffer::Kind::Uniform, gpu::buffer::Usage::DynamicDraw);
     factory.initialize_buffer(&uniform_buffer, YELLOW);
     
-    let position_accessor = graphics::buffer::Accessor::new(vertex_buffer, POSITION_FORMAT, 0, 0);
-    let mut vertex_array_builder = graphics::VertexArray::builder();
+    let position_accessor = gpu::buffer::Accessor::new(vertex_buffer, POSITION_FORMAT, 0, 0);
+    let mut vertex_array_builder = gpu::VertexArray::builder();
     vertex_array_builder.attributes.insert(0, position_accessor);
     let vertex_array = factory.vertex_array(vertex_array_builder);
     
@@ -122,9 +122,9 @@ fn main() {
         gl::UNSIGNED_BYTE,
         GREEN_PIXEL,
     );
-    let sampler = graphics::Sampler::from_texture2(texture);
+    let sampler = gpu::Sampler::from_texture2(texture);
     
-    let mut invocation = graphics::program::Invocation {
+    let mut invocation = gpu::program::Invocation {
         program: &program,
         uniforms: [None, None, None, None],
         samplers: [None, None, None, None],

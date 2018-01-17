@@ -1,8 +1,9 @@
 //! Vertex array objects.
 
+use queue;
+use std::{cmp, fmt, hash, ops, sync};
+
 use buffer::Accessor;
-use std::{cmp, fmt, hash, ops};
-use std::sync::{self, mpsc};
 use vec_map::VecMap;
 
 /// The maximum number of vertex attributes permitted by the crate.
@@ -14,7 +15,7 @@ pub(crate) type Id = u32;
 /// Returns the VAO back to the factory upon destruction.
 struct Destructor {
     id: u32,
-    tx: mpsc::Sender<Id>
+    tx: queue::Sender<Id>
 }
 
 impl ops::Drop for Destructor {
@@ -44,7 +45,7 @@ impl VertexArray {
     pub(crate) fn new(
         id: Id,
         builder: Builder,
-        tx: mpsc::Sender<Id>,
+        tx: queue::Sender<Id>,
     ) -> Self {
         Self {
             id,

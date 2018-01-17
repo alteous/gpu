@@ -1,6 +1,8 @@
+extern crate crossbeam_channel;
 extern crate vec_map;
 
 mod factory;
+mod queue;
 pub mod gl;
 
 pub mod buffer;

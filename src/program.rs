@@ -1,8 +1,8 @@
 //! GLSL programs.
 
 use gl;
-use std::{cmp, ffi, fmt, hash, ops};
-use std::sync::{self, mpsc};
+use queue;
+use std::{cmp, ffi, fmt, hash, ops, sync};
 
 use buffer::Buffer;
 use texture::Sampler;
@@ -37,6 +37,7 @@ impl Kind {
 }
 
 /// Specifies whether the destroyed item was an object or a program.
+#[derive(Clone)]
 pub(crate) enum Destroyed {
     /// A shader object.
     Object(u32),
@@ -49,7 +50,7 @@ pub(crate) enum Destroyed {
 /// destroyed.
 pub(crate) struct ObjectDestructor {
     id: u32,
-    tx: mpsc::Sender<Destroyed>,
+    tx: queue::Sender<Destroyed>,
 }
 
 impl ops::Drop for ObjectDestructor {
@@ -63,7 +64,7 @@ impl ops::Drop for ObjectDestructor {
 /// destroyed.
 pub(crate) struct ProgramDestructor {
     id: u32,
-    tx: mpsc::Sender<Destroyed>,
+    tx: queue::Sender<Destroyed>,
 }
 
 impl ops::Drop for ProgramDestructor {
@@ -90,7 +91,7 @@ impl Object {
     pub(crate) fn new(
         id: u32,
         kind: Kind,
-        tx: mpsc::Sender<Destroyed>,
+        tx: queue::Sender<Destroyed>,
     ) -> Self {
         Self {
             _destructor: sync::Arc::new(
@@ -158,7 +159,7 @@ impl Program {
     /// Constructor.
     pub(crate) fn new(
         id: u32,
-        tx: mpsc::Sender<Destroyed>,
+        tx: queue::Sender<Destroyed>,
     ) -> Self {
         Self {
             _destructor: sync::Arc::new(

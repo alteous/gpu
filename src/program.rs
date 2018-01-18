@@ -48,6 +48,7 @@ pub(crate) enum Destroyed {
 
 /// Pushes the shader/program ID onto the factory program queue when
 /// destroyed.
+#[derive(Clone)]
 pub(crate) struct ObjectDestructor {
     id: u32,
     tx: queue::Sender<Destroyed>,
@@ -62,6 +63,7 @@ impl ops::Drop for ObjectDestructor {
 
 /// Pushes the shader/program ID onto the factory program queue when
 /// destroyed.
+#[derive(Clone)]
 pub(crate) struct ProgramDestructor {
     id: u32,
     tx: queue::Sender<Destroyed>,
@@ -75,6 +77,7 @@ impl ops::Drop for ProgramDestructor {
 
 /// An unlinked component of a GLSL program, e.g. a compiled
 /// vertex or fragment shader.
+#[derive(Clone)]
 pub struct Object {
     /// The OpenGL shader object ID.
     id: u32,
@@ -135,6 +138,7 @@ impl hash::Hash for Object {
 }
 
 /// An invocation of a shader program.
+#[derive(Clone)]
 pub struct Invocation<'a> {
     /// The program to bind at draw time.
     pub program: &'a Program,
@@ -147,6 +151,7 @@ pub struct Invocation<'a> {
 }
 
 /// A compiled shader program.
+#[derive(Clone)]
 pub struct Program {
     /// The OpenGL program ID.
     id: u32,

@@ -1,3 +1,4 @@
+extern crate env_logger;
 extern crate glutin;
 extern crate gpu;
 
@@ -31,12 +32,10 @@ const TRIANGLE_DATA: &'static [Vertex] = &[
 ];
 
 const YELLOW: &'static [UniformBlock] = &[
-    UniformBlock { color: [1.0, 1.0, 0.0, 1.0] },
+    UniformBlock { color: [1.0, 1.0, 1.0, 1.0] },
 ];
 
-const GREEN_PIXEL: &'static [[u8; 4]] = &[
-    [0, 255, 0, 255],
-];
+const GREEN_PIXEL: &'static [u32] = &[0x00FFFF];
 
 fn cstr<'a, T>(bytes: &'a T) -> &'a ffi::CStr
     where T: AsRef<[u8]>
@@ -56,6 +55,8 @@ fn read_file_to_end<P>(path: P) -> io::Result<Vec<u8>>
 }
 
 fn main() {
+    let _ = env_logger::init();
+    
     let mut event_loop = glutin::EventsLoop::new();
     let window_builder = glutin::WindowBuilder::new();
     let context_builder = glutin::ContextBuilder::new()
@@ -73,7 +74,7 @@ fn main() {
     });
 
     let vertex_shader = {
-        let mut source = read_file_to_end("triangle.vs").unwrap();
+        let mut source = read_file_to_end("triangle.vert").unwrap();
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Vertex,
@@ -81,7 +82,7 @@ fn main() {
         )
     };
     let fragment_shader = {
-        let mut source = read_file_to_end("triangle.fs").unwrap();
+        let mut source = read_file_to_end("triangle.frag").unwrap();
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Fragment,
@@ -110,7 +111,7 @@ fn main() {
     let mut vertex_array_builder = gpu::VertexArray::builder();
     vertex_array_builder.attributes.insert(0, position_accessor);
     let vertex_array = factory.vertex_array(vertex_array_builder);
-    
+
     let texture = factory.texture2(Default::default());
     factory.initialize_texture2(
         &texture,
@@ -118,12 +119,18 @@ fn main() {
         gl::RGBA8,
         1,
         1,
-        gl::RGBA,
-        gl::UNSIGNED_BYTE,
+        gl::BGRA,
+        gl::UNSIGNED_INT_8_8_8_8_REV,
         GREEN_PIXEL,
     );
     let sampler = gpu::Sampler::from_texture2(texture);
-    
+
+    let draw_call = gpu::DrawCall {
+        mode: gpu::Mode::Arrays,
+        primitive: gpu::Primitive::Triangles,
+        offset: 0,
+        count: 3,
+    };
     let mut invocation = gpu::program::Invocation {
         program: &program,
         uniforms: [None, None, None, None],
@@ -135,7 +142,7 @@ fn main() {
     let mut running = true;
     while running {
         window.swap_buffers().unwrap();
-        factory.draw(&vertex_array, 0 .. 3, &invocation);
+        factory.draw(&vertex_array, &draw_call, &invocation);
         event_loop.poll_events(|event| {
             match event {
                 Event::WindowEvent { event, .. } => {

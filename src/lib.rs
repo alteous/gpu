@@ -13,6 +13,9 @@ pub mod texture;
 pub mod vertex_array;
 
 #[doc(inline)]
+pub use buffer::Accessor;
+
+#[doc(inline)]
 pub use buffer::Buffer;
 
 #[doc(inline)]

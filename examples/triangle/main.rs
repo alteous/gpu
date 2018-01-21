@@ -74,7 +74,7 @@ fn main() {
     });
 
     let vertex_shader = {
-        let mut source = read_file_to_end("triangle.vert").unwrap();
+        let mut source = read_file_to_end("examples/triangle/shader.vert").unwrap();
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Vertex,
@@ -82,7 +82,7 @@ fn main() {
         )
     };
     let fragment_shader = {
-        let mut source = read_file_to_end("triangle.frag").unwrap();
+        let mut source = read_file_to_end("examples/triangle/shader.frag").unwrap();
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Fragment,

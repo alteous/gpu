@@ -4,6 +4,7 @@ use gl;
 use queue;
 use std::{cmp, ffi, fmt, hash, ops, sync};
 
+use ::ArrayVec;
 use buffer::Buffer;
 use texture::Sampler;
 
@@ -144,10 +145,10 @@ pub struct Invocation<'a> {
     pub program: &'a Program,
 
     /// Uniform buffers to be bound to the program at draw time.
-    pub uniforms: [Option<Buffer>; MAX_UNIFORMS],
+    pub uniforms: ArrayVec<[(u32, &'a Buffer); MAX_UNIFORMS]>,
 
     /// Texture samplers to be bound to the program at draw time.
-    pub samplers: [Option<Sampler>; MAX_SAMPLERS],
+    pub samplers: ArrayVec<[(u32, &'a Sampler); MAX_SAMPLERS]>,
 }
 
 /// A compiled shader program.

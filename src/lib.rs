@@ -1,3 +1,4 @@
+extern crate arrayvec;
 extern crate crossbeam_channel;
 #[macro_use] extern crate log;
 extern crate vec_map;
@@ -11,6 +12,9 @@ pub mod draw_call;
 pub mod program;
 pub mod texture;
 pub mod vertex_array;
+
+/// Fixed size vector type.
+pub type ArrayVec<T> = arrayvec::ArrayVec<T>;
 
 #[doc(inline)]
 pub use buffer::Accessor;
@@ -29,6 +33,9 @@ pub use draw_call::Primitive;
 
 #[doc(inline)]
 pub use factory::Factory;
+
+#[doc(inline)]
+pub use program::Invocation;
 
 #[doc(inline)]
 pub use program::Program;

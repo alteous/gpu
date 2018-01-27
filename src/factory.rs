@@ -10,7 +10,7 @@ use texture;
 use vertex_array;
 
 use draw_call::{DrawCall, Mode};
-use program::{Invocation, MAX_SAMPLERS, MAX_UNIFORMS};
+use program::Invocation;
 use queue::Queue;
 use {Buffer, Program, Texture2, VertexArray};
 
@@ -45,6 +45,16 @@ impl Factory {
             vertex_array_queue: Queue::new(),
             program_queue: Queue::new(),
         }
+    }
+
+    /// Clear the color buffer.
+    pub fn clear_color_buffer(&self, r: f32, g: f32, b: f32, a: f32) {
+        self.backend.clear_color(r, g, b, a);
+    }
+
+    /// Clear the depth buffer.
+    pub fn clear_depth_buffer(&self) {
+        self.backend.clear_depth();
     }
 
     /// (Re)-initialize the contents of a [`Buffer`].
@@ -134,6 +144,18 @@ impl Factory {
         Program::new(id, tx)
     }
 
+    /// Sets the binding index for a named uniform block.
+    pub fn set_uniform_block_binding(
+        &self,
+        program: &Program,
+        name: &ffi::CStr,
+        binding: u32,
+    ) {
+        if let Some(index) = self.query_uniform_block_index(program, name) {
+            self.backend.uniform_block_binding(program.id(), index, binding);
+        }
+    }
+
     /// Retrieves the index of a named uniform block.
     pub fn query_uniform_block_index(
         &self,
@@ -213,16 +235,12 @@ impl Factory {
     ) {
         self.backend.bind_vertex_array(vertex_array.id());
         self.backend.use_program(invocation.program.id());
-        for i in 0 .. MAX_UNIFORMS {
-            if let Some(ref buffer) = invocation.uniforms[i] {
-                self.backend.bind_buffer_base(gl::UNIFORM_BUFFER, i as _, buffer.id());
-            }
+        for &(idx, buf) in &invocation.uniforms {
+            self.backend.bind_buffer_base(gl::UNIFORM_BUFFER, idx, buf.id());
         }
-        for i in 0 .. MAX_SAMPLERS {
-            if let Some(ref sampler) = invocation.samplers[i] {
-                self.backend.active_texture(i as u32);
-                self.backend.bind_texture(sampler.ty(), sampler.id());
-            }
+        for &(idx, sampler) in &invocation.samplers {
+            self.backend.active_texture(idx);
+            self.backend.bind_texture(sampler.ty(), sampler.id());
         }
         match draw_call.mode {
             Mode::Arrays => {

@@ -16,7 +16,7 @@ impl Backend {
         let gl = rc::Rc::new(Gl::load_with(func));
         Backend { gl }
     }
-    
+
     // Error checking
 
     /// Corresponds to `glGetError` plus an error check.
@@ -24,6 +24,29 @@ impl Backend {
         let error = unsafe { self.gl.GetError() };
         if error != 0 {
             error!(target: "gl", "0x{:x}", error);
+        }
+    }
+
+    // Pipeline state operations
+
+    /// Corresponds to `glClearColor + glClear(GL_COLOR_BUFFER_BIT)`.
+    pub fn clear_color(&self, r: f32, g: f32, b: f32, a: f32) {
+        unsafe {
+            trace!(target: "gl", "glClearColor{:?}", (r, g, b, a));
+            self.gl.ClearColor(r, g, b, a);
+            self.check_error();
+            trace!(target: "gl", "glClear(GL_COLOR_BUFFER_BIT)");
+            self.gl.Clear(COLOR_BUFFER_BIT);
+            self.check_error();
+        }
+    }
+
+    /// Corresponds to `glClear(GL_DEPTH_BUFFER_BIT)`.
+    pub fn clear_depth(&self) {
+        unsafe {
+            trace!(target: "gl", "glClear(GL_DEPTH_BUFFER_BIT)");
+            self.gl.Clear(DEPTH_BUFFER_BIT);
+            self.check_error();
         }
     }
 
@@ -200,6 +223,20 @@ impl Backend {
         index
     }
 
+    /// Corresponds to `glUniformBlockBinding`.
+    pub fn uniform_block_binding(
+        &self,
+        program: u32,
+        index: u32,
+        binding: u32,
+    ) {
+        trace!(target: "gl", "glUniformBlockBinding{:?} ", (program, index, binding));
+        unsafe {
+            self.gl.UniformBlockBinding(program, index, binding);
+        }
+        self.check_error();
+    }
+
     /// Corresponds to `glGetUniformLocation`.
     pub fn get_uniform_location(
         &self,
@@ -330,10 +367,10 @@ impl Backend {
     }
 
     /// Corresponds to `glBindBufferBase`.
-    pub fn bind_buffer_base(&self, target: u32, binding: u8, id: u32) {
+    pub fn bind_buffer_base(&self, target: u32, binding: u32, id: u32) {
         unsafe {
             trace!(target: "gl", "glBindBufferBase{:?}", (target, binding, id));
-            self.gl.BindBufferBase(target, binding as _, id);
+            self.gl.BindBufferBase(target, binding, id);
         }
         self.check_error();
     }

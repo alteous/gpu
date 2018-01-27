@@ -98,7 +98,7 @@ fn main() {
         let bbinding = factory.query_uniform_block_index(&prog, bname);
         let sname = cstr(b"u_Sampler\0");
         let sbinding = factory.query_uniform_index(&prog, sname);
-        (prog, bbinding.unwrap() as usize, sbinding.unwrap() as usize)
+        (prog, bbinding.unwrap(), sbinding.unwrap())
     };
 
     let vertex_buffer = factory.buffer(gpu::buffer::Kind::Array, gpu::buffer::Usage::StaticDraw);
@@ -106,7 +106,7 @@ fn main() {
 
     let uniform_buffer = factory.buffer(gpu::buffer::Kind::Uniform, gpu::buffer::Usage::DynamicDraw);
     factory.initialize_buffer(&uniform_buffer, YELLOW);
-    
+
     let position_accessor = gpu::buffer::Accessor::new(vertex_buffer, POSITION_FORMAT, 0, 0);
     let mut vertex_array_builder = gpu::VertexArray::builder();
     vertex_array_builder.attributes.insert(0, position_accessor);
@@ -133,11 +133,11 @@ fn main() {
     };
     let mut invocation = gpu::program::Invocation {
         program: &program,
-        uniforms: [None, None, None, None],
-        samplers: [None, None, None, None],
+        uniforms: gpu::ArrayVec::new(),
+        samplers: gpu::ArrayVec::new(),
     };
-    invocation.uniforms[block_binding] = Some(uniform_buffer);
-    invocation.samplers[sampler_binding] = Some(sampler);
+    invocation.uniforms.push((block_binding, &uniform_buffer));
+    invocation.samplers.push((sampler_binding, &sampler));
 
     let mut running = true;
     while running {

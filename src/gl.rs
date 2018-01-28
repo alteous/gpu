@@ -50,6 +50,51 @@ impl Backend {
         }
     }
 
+    /// Corresponds to `glEnable`.
+    pub fn enable(&self, state: u32) {
+        trace!(target: "gl", "glEnable{:?}", (state,));
+        unsafe {
+            self.gl.Enable(state);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glDisable`.
+    pub fn disable(&self, state: u32) {
+        trace!(target: "gl", "glDisable{:?}", (state,));
+        unsafe {
+            self.gl.Disable(state);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glCullFace`.
+    pub fn cull_face(&self, opt: u32) {
+        trace!(target: "gl", "glCullFace{:?}", (opt,));
+        unsafe {
+            self.gl.CullFace(opt);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glFrontFace`.
+    pub fn front_face(&self, opt: u32) {
+        trace!(target: "gl", "glFrontFace{:?}", (opt,));
+        unsafe {
+            self.gl.FrontFace(opt);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glDepthFunc`.
+    pub fn depth_func(&self, opt: u32) {
+        trace!(target: "gl", "glDepthFunc{:?}", (opt,));
+        unsafe {
+            self.gl.DepthFunc(opt);
+        }
+        self.check_error();
+    }
+    
     // Buffer operations
 
     /// Corresponds to `glGenBuffer`.
@@ -128,6 +173,17 @@ impl Backend {
         unsafe {
             trace!(target: "gl", "glEnableVertexAttribArray{:?}", (idx,));
             self.gl.EnableVertexAttribArray(idx as _);
+        }
+        self.check_error();
+    }
+
+    // Framebuffer operations.
+
+    /// Corresponds to `glBindFramebuffer`.
+    pub fn bind_framebuffer(&self, target: u32, id: u32) {
+        trace!(target: "gl", "glBindFramebuffer{:?} ", (target, id));
+        unsafe {
+            self.gl.BindFramebuffer(target, id);
         }
         self.check_error();
     }

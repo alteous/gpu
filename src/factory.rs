@@ -10,7 +10,9 @@ use texture;
 use vertex_array;
 
 use draw_call::{DrawCall, Mode};
+use framebuffer::Framebuffer;
 use program::Invocation;
+use pipeline::State;
 use queue::Queue;
 use {Buffer, Program, Texture2, VertexArray};
 
@@ -35,11 +37,11 @@ pub struct Factory {
 
 impl Factory {
     /// Constructor.
-    pub fn new<F>(func: F) -> Self
+    pub fn new<F>(query_proc_address: F) -> Self
         where F: FnMut(&str) -> *const os::raw::c_void
     {
         Self {
-            backend: gl::Backend::load(func),
+            backend: gl::Backend::load(query_proc_address),
             buffer_queue: Queue::new(),
             texture_queue: Queue::new(),
             vertex_array_queue: Queue::new(),
@@ -229,10 +231,22 @@ impl Factory {
     /// Perform a draw call.
     pub fn draw(
         &self,
+        framebuffer: &Framebuffer,
+        state: &State,
         vertex_array: &VertexArray,
         draw_call: &DrawCall,
         invocation: &Invocation,
     ) {
+        self.backend.bind_framebuffer(gl::FRAMEBUFFER, framebuffer.id());
+        if let Some(opt) = state.culling.as_gl_enum_if_enabled() {
+            self.backend.enable(gl::CULL_FACE);
+            self.backend.cull_face(opt);
+            self.backend.front_face(state.front_face.as_gl_enum());
+        } else {
+            self.backend.disable(gl::CULL_FACE);
+        }
+        self.backend.enable(gl::DEPTH_TEST);
+        self.backend.depth_func(state.depth_test.as_gl_enum());
         self.backend.bind_vertex_array(vertex_array.id());
         self.backend.use_program(invocation.program.id());
         for &(idx, buf) in &invocation.uniforms {

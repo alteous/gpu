@@ -9,12 +9,26 @@ pub mod gl;
 
 pub mod buffer;
 pub mod draw_call;
+pub mod framebuffer;
 pub mod program;
+pub mod pipeline;
 pub mod texture;
 pub mod vertex_array;
 
+use std::os;
+
 /// Fixed size vector type.
 pub type ArrayVec<T> = arrayvec::ArrayVec<T>;
+
+/// Initialize the library, creating a default framebuffer to render to and
+/// a factory to instantiate library objects.
+pub fn init<F>(query_proc_address: F) -> (Framebuffer, Factory)
+    where F: FnMut(&str) -> *const os::raw::c_void
+{
+    let factory = Factory::new(query_proc_address);
+    let framebuffer = Framebuffer::new(0);
+    (framebuffer, factory)
+}
 
 #[doc(inline)]
 pub use buffer::Accessor;
@@ -35,10 +49,16 @@ pub use draw_call::Primitive;
 pub use factory::Factory;
 
 #[doc(inline)]
+pub use framebuffer::Framebuffer;
+
+#[doc(inline)]
 pub use program::Invocation;
 
 #[doc(inline)]
 pub use program::Program;
+
+#[doc(inline)]
+pub use pipeline::State;
 
 #[doc(inline)]
 pub use texture::Sampler;
@@ -48,4 +68,3 @@ pub use texture::Texture2;
 
 #[doc(inline)]
 pub use vertex_array::VertexArray;
-

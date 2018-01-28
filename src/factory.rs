@@ -12,7 +12,7 @@ use vertex_array;
 use draw_call::{DrawCall, Mode};
 use framebuffer::Framebuffer;
 use program::Invocation;
-use pipeline::State;
+use pipeline::{PolygonMode, State};
 use queue::Queue;
 use {Buffer, Program, Texture2, VertexArray};
 
@@ -255,6 +255,12 @@ impl Factory {
         for &(idx, sampler) in &invocation.samplers {
             self.backend.active_texture(idx);
             self.backend.bind_texture(sampler.ty(), sampler.id());
+        }
+        self.backend.polygon_mode(gl::FRONT_AND_BACK, state.polygon_mode.as_gl_enum());
+        match state.polygon_mode {
+            PolygonMode::Point(size) => self.backend.point_size(size as f32),
+            PolygonMode::Line(width) => self.backend.line_width(width as f32),
+            PolygonMode::Fill => {},
         }
         match draw_call.mode {
             Mode::Arrays => {

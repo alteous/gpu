@@ -1,5 +1,34 @@
 use gl;
 
+/// Specifies the polygon rasterization method.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum PolygonMode {
+    /// Vertices marked as the start of a boundary edge are drawn as points.
+    Point(i32),
+
+    /// Boundary edges of the polygon are drawn as line segments.
+    Line(i32),
+
+    /// The interior of the polygon is filled.
+    Fill,
+}
+
+impl Default for PolygonMode {
+    fn default() -> Self {
+        PolygonMode::Fill
+    }
+}
+
+impl PolygonMode {
+    pub(crate) fn as_gl_enum(&self) -> u32 {
+        match *self {
+            PolygonMode::Point(_) => gl::POINT,
+            PolygonMode::Line(_) => gl::LINE,
+            PolygonMode::Fill => gl::FILL,
+        }
+    }
+}
+
 /// Specifies depth buffer testing.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DepthTest {
@@ -99,5 +128,7 @@ pub struct State {
 
     /// Hardware depth testing mode.
     pub depth_test: DepthTest,
-}
 
+    /// Specifies the polygon rasterization method.
+    pub polygon_mode: PolygonMode,
+}

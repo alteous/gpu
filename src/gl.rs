@@ -94,7 +94,34 @@ impl Backend {
         }
         self.check_error();
     }
-    
+
+    /// Corresponds to `glPolygonMode`.
+    pub fn polygon_mode(&self, face: u32, mode: u32) {
+        trace!(target: "gl", "glPolygonMode{:?}", (face, mode));
+        unsafe {
+            self.gl.PolygonMode(face, mode);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glLineWidth`.
+    pub fn line_width(&self, width: f32) {
+        trace!(target: "gl", "glLineWidth{:?}", (width,));
+        unsafe {
+            self.gl.LineWidth(width);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glPointSize`.
+    pub fn point_size(&self, size: f32) {
+        trace!(target: "gl", "glPointSize{:?}", (size,));
+        unsafe {
+            self.gl.PointSize(size);
+        }
+        self.check_error();
+    }
+
     // Buffer operations
 
     /// Corresponds to `glGenBuffer`.

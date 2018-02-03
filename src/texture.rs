@@ -7,6 +7,68 @@ use std::{cmp, fmt, hash, ops, sync};
 /// OpenGL texture ID type.
 pub type Id = u32;
 
+/// Format of pixel data.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum PixelFormat {
+    /// Corresponds to `GL_RGB32F`.
+    Rgb32f,
+
+    /// Corresponds to `GL_RGBA32F`.
+    Rgba32f,
+
+    /// Corresponds to `GL_RGB8`.
+    Rgb8,
+
+    /// Corresponds to `GL_RGBA8`.
+    Rgba8,
+}
+
+impl PixelFormat {
+    pub(crate) fn as_gl_enum(&self) -> u32 {
+        match *self {
+            PixelFormat::Rgb32f => gl::RGB32F,
+            PixelFormat::Rgba32f => gl::RGBA32F,
+            PixelFormat::Rgb8 => gl::RGB8,
+            PixelFormat::Rgba8 => gl::RGBA8,
+        }
+    }
+}
+
+/// Pixel channel order.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ChannelOrder {
+    /// Corresponds to `GL_RED`.
+    R,
+
+    /// Corresponds to `GL_RG`.
+    Rg,
+
+    /// Corresponds to `GL_RGB`.
+    Rgb,
+
+    /// Corresponds to `GL_BGR`.
+    Bgr,
+
+    /// Corresponds to `GL_RGBA`.
+    Rgba,
+
+    /// Corresponds to `GL_BGRA`.
+    Bgra,
+}
+
+impl ChannelOrder {
+    pub(crate) fn as_gl_enum(&self) -> u32 {
+        match *self {
+            ChannelOrder::R => gl::RED,
+            ChannelOrder::Rg => gl::RG,
+            ChannelOrder::Rgb => gl::RGB,
+            ChannelOrder::Bgr => gl::BGR,
+            ChannelOrder::Rgba => gl::RGBA,
+            ChannelOrder::Bgra => gl::BGRA,
+        }
+    }
+}
+
 /// Texture filtering mode.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Filter {
@@ -165,6 +227,10 @@ pub struct Texture2 {
     /// The OpenGL texture ID.
     id: Id,
 
+    width: u32,
+    height: u32,
+    format: PixelFormat,
+    
     /// Returns the texture back to the factory upon destruction.
     _destructor: sync::Arc<Destructor>,
 }
@@ -172,14 +238,20 @@ pub struct Texture2 {
 impl Texture2 {
     pub(crate) fn new(
         id: Id,
+        width: u32,
+        height: u32,
+        format: PixelFormat,
         tx: queue::Sender<Id>,
     ) -> Self {
         Texture2 {
             id,
+            width,
+            height,
+            format,
             _destructor: sync::Arc::new(Destructor { id, tx }),
         }
     }
-    
+
     /// Constructs a new texture [`Builder`].
     ///
     /// [`Builder`]: struct.Builder.html

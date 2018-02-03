@@ -122,6 +122,15 @@ impl Backend {
         self.check_error();
     }
 
+    /// Corresponds to `glViewport`.
+    pub fn viewport(&self, x: u32, y: u32, w: u32, h: u32) {
+        trace!(target: "gl", "glViewport{:?}", (x, y, w, h));
+        unsafe {
+            self.gl.Viewport(x as _, y as _, w as _, h as _);
+        }
+        self.check_error();
+    }
+
     // Buffer operations
 
     /// Corresponds to `glGenBuffer`.
@@ -206,15 +215,94 @@ impl Backend {
 
     // Framebuffer operations.
 
-    /// Corresponds to `glBindFramebuffer`.
-    pub fn bind_framebuffer(&self, target: u32, id: u32) {
-        trace!(target: "gl", "glBindFramebuffer{:?} ", (target, id));
+    /// Corresponds to `glGenFramebuffers(1)`.
+    pub fn gen_framebuffer(&self) -> u32 {
+        trace!(target: "gl", "glGenFramebuffers(1)");
+        let mut id = 0;
         unsafe {
-            self.gl.BindFramebuffer(target, id);
+            self.gl.GenFramebuffers(1, &mut id as *mut _);
+        }
+        self.check_error();
+        id
+    }
+
+    /// Corresponds to `glGenRenderbuffers(1)`.
+    pub fn gen_renderbuffer(&self) -> u32 {
+        trace!(target: "gl", "glGenRenderbuffers(1)");
+        let mut id = 0;
+        unsafe {
+            self.gl.GenRenderbuffers(1, &mut id as *mut _);
+        }
+        self.check_error();
+        id
+    }
+
+    /// Corresponds to `glBindFramebuffer`.
+    pub fn bind_framebuffer(&self, id: u32) {
+        trace!(target: "gl", "glBindFramebuffer{:?} ", (FRAMEBUFFER, id));
+        unsafe {
+            self.gl.BindFramebuffer(FRAMEBUFFER, id);
         }
         self.check_error();
     }
 
+    /// Corresponds to `glFramebufferTexture2D`.
+    pub fn framebuffer_texture2d(&self, attachment: u32, texture: u32) {
+        trace!(
+            target: "gl",
+            "glFramebufferTexture2D{:?}",
+            (
+                FRAMEBUFFER,
+                COLOR_ATTACHMENT0 + attachment,
+                TEXTURE_2D,
+                texture,
+                0,
+            ),
+        );
+        unsafe {
+            self.gl.FramebufferTexture2D(
+                FRAMEBUFFER,
+                COLOR_ATTACHMENT0 + attachment,
+                TEXTURE_2D,
+                texture,
+                0,
+            );
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glFramebufferRenderbuffer`.
+    pub fn framebuffer_renderbuffer(&self, attachment: u32, renderbuffer: u32) {
+        trace!(
+            target: "gl",
+            "glFramebufferRenderbuffer{:?}",
+            (
+                FRAMEBUFFER,
+                COLOR_ATTACHMENT0 + attachment,
+                RENDERBUFFER,
+                renderbuffer,
+            ),
+        );
+        unsafe {
+            self.gl.FramebufferRenderbuffer(
+                FRAMEBUFFER,
+                COLOR_ATTACHMENT0 + attachment,
+                RENDERBUFFER,
+                renderbuffer,
+            );
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glDrawBuffers`.
+    pub fn draw_buffers(&self, buffers: &[u32]) {
+        trace!(target: "gl", "glDrawBuffers{:?}", (buffers.len(), buffers));
+        unsafe {
+            self.gl.DrawBuffers(buffers.len() as _, buffers.as_ptr() as _);
+        }
+        self.check_error();
+    }
+    
     // Program operations
 
     /// Corresponds to `glCreateShader`.
@@ -369,28 +457,26 @@ impl Backend {
     }
 
     /// Corresponds to `glTexImage2D`.
-    pub fn tex_image_2d<T>(
+    pub fn tex_image_2d(
         &self,
         target: u32,
-        level: u32,
         internal_format: u32,
         width: u32,
         height: u32,
-        border: u32,
         format: u32,
         ty: u32,
-        data: *const T,
+        data: *const os::raw::c_void,
     ) {
         unsafe {
             trace!(target: "gl", 
                 "glTexImage2D{:?}",
                 (
                     target,
-                    level,
+                    0,
                     internal_format,
                     width,
                     height,
-                    border,
+                    0,
                     format,
                     ty,
                     data,
@@ -398,14 +484,45 @@ impl Backend {
             );
             self.gl.TexImage2D(
                 target,
-                level as _,
+                0,
                 internal_format as _,
                 width as _,
                 height as _,
-                border as _,
+                0,
                 format,
                 ty,
-                data as _,
+                data,
+            );
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glGetTexImage`.
+    pub fn get_tex_image(
+        &self,
+        target: u32,
+        format: u32,
+        ty: u32,
+        ptr: *mut os::raw::c_void,
+    ) {
+        trace!(
+            target: "gl",
+            "glGetTexImage{:?}",
+            (
+                target,
+                0,
+                format,
+                ty,
+                ptr,
+            ),
+        );
+        unsafe {
+            self.gl.GetTexImage(
+                target,
+                0,
+                format,
+                ty,
+                ptr,
             );
         }
         self.check_error();

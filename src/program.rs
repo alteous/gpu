@@ -6,16 +6,38 @@ use std::{cmp, ffi, fmt, hash, ops, sync};
 
 use ::ArrayVec;
 use buffer::Buffer;
+use framebuffer::MAX_COLOR_ATTACHMENTS;
 use texture::Sampler;
 
 /// Specifies the maximum number of uniforms permitted by the crate.
-pub const MAX_UNIFORMS: usize = 4;
+pub const MAX_UNIFORM_BLOCKS: usize = 4;
 
 /// Specifies the maximum number of samplers permitted by the crate.
 pub const MAX_SAMPLERS: usize = 4;
 
 /// The program source code type.
 pub type Source = ffi::CStr;
+
+pub struct Interface {
+    pub uniform_blocks: [UniformBlockBinding; MAX_UNIFORM_BLOCKS],
+    pub samplers: [SamplerBinding; MAX_SAMPLERS],
+    pub color_attachments: [ColorAttachmentBinding; MAX_COLOR_ATTACHMENTS],
+}
+
+pub enum UniformBlockBinding {
+    Required(&'static u8),
+    None,
+}
+
+pub enum SamplerBinding {
+    Required(&'static u8),
+    None,
+}
+
+pub enum ColorAttachmentBinding {
+    Required(&'static u8),
+    None,
+}
 
 /// Determines the shader type, e.g. a vertex or fragment shader.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -145,7 +167,7 @@ pub struct Invocation<'a> {
     pub program: &'a Program,
 
     /// Uniform buffers to be bound to the program at draw time.
-    pub uniforms: ArrayVec<[(u32, &'a Buffer); MAX_UNIFORMS]>,
+    pub uniforms: ArrayVec<[(u32, &'a Buffer); MAX_UNIFORM_BLOCKS]>,
 
     /// Texture samplers to be bound to the program at draw time.
     pub samplers: ArrayVec<[(u32, &'a Sampler); MAX_SAMPLERS]>,

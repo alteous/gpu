@@ -5,15 +5,17 @@
 use buffer;
 use gl;
 use program;
-use std::{ffi, mem, os};
+use std::{ffi, mem, os, ptr};
 use texture;
 use vertex_array;
 
 use draw_call::{DrawCall, Mode};
-use framebuffer::Framebuffer;
+use framebuffer::{ColorAttachment, Framebuffer, MAX_COLOR_ATTACHMENTS};
 use program::Invocation;
 use pipeline::{PolygonMode, State};
 use queue::Queue;
+use renderbuffer::Renderbuffer;
+use texture::PixelFormat;
 use {Buffer, Program, Texture2, VertexArray};
 
 /// OpenGL memory manager.
@@ -182,17 +184,45 @@ impl Factory {
         }
     }
 
-    /// Create an uninitialized 2D texture.
-    pub fn texture2(&self, builder: texture::Builder) -> Texture2 {
+    /// Create a 2D texture backed by uninitialized GPU memory.
+    pub fn texture2(
+        &self,
+        width: u32,
+        height: u32,
+        format: PixelFormat,
+    ) -> Texture2 {
         let id = self.backend.gen_texture();
         let tx = self.texture_queue.tx();
         self.backend.bind_texture(gl::TEXTURE_2D, id);
-        self.backend.tex_parameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, builder.min_filter.as_gl_enum());
-        self.backend.tex_parameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, builder.mag_filter.as_gl_enum());
-        self.backend.tex_parameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, builder.wrap_s.as_gl_enum());
-        self.backend.tex_parameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, builder.wrap_t.as_gl_enum());
+        self.backend.tex_image_2d(
+            gl::TEXTURE_2D,
+            format.as_gl_enum(),
+            width as _,
+            height as _,
+            gl::RGBA,
+            gl::UNSIGNED_BYTE,
+            ptr::null() as *const _,
+        );
         self.backend.bind_texture(gl::TEXTURE_2D, 0);
-        Texture2::new(id, tx)
+        Texture2::new(id, width, height, format, tx)
+    }
+
+    /// Read back the contents of a [`Texture2`].
+    ///
+    /// [`Texture2`]: texture/struct.Texture2.html
+    pub fn read_texture2<T>(
+        &self,
+        texture: &Texture2,
+        format: (u32, u32),
+        contents: &mut [T],
+    ) {
+        self.backend.bind_texture(gl::TEXTURE_2D, texture.id());
+        self.backend.get_tex_image(
+            gl::TEXTURE_2D,
+            format.0,
+            format.1,
+            contents.as_mut_ptr() as *mut _,
+        );
     }
 
     /// (Re)-initialize the contents of a [`Texture2`].
@@ -210,22 +240,59 @@ impl Factory {
         data: &[T],
     ) {
         self.backend.bind_texture(gl::TEXTURE_2D, texture.id());
-        let (level, border) = (0, 0);
         self.backend.tex_image_2d(
             gl::TEXTURE_2D,
-            level,
             internal_format,
             width,
             height,
-            border,
             format,
             ty,
-            data.as_ptr(),
+            data.as_ptr() as *const _,
         );
         if generate_mipmap {
             self.backend.generate_mipmap(gl::TEXTURE_2D);
         }
         self.backend.bind_texture(gl::TEXTURE_2D, 0);
+    }
+
+    /// Create a renderbuffer.
+    pub fn renderbuffer(&self) -> Renderbuffer {
+        let id = self.backend.gen_renderbuffer();
+        Renderbuffer::new(id)
+    }
+
+    /// Create a framebuffer.
+    pub fn framebuffer(
+        &self,
+        color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+    ) -> Framebuffer {
+        let id = self.backend.gen_framebuffer();
+        self.backend.bind_framebuffer(id);
+        let mut draw_buffers = vec![];
+        for attachment in 0 .. MAX_COLOR_ATTACHMENTS {
+            match color_attachments[attachment] {
+                ColorAttachment::Renderbuffer(ref renderbuffer) => {
+                    draw_buffers.push(gl::COLOR_ATTACHMENT0 + attachment as u32);
+                    self.backend.framebuffer_renderbuffer(
+                        attachment as u32,
+                        renderbuffer.id(),
+                    )
+                }
+                ColorAttachment::Texture2(ref texture2) => {
+                    draw_buffers.push(gl::COLOR_ATTACHMENT0 + attachment as u32);
+                    self.backend.framebuffer_texture2d(
+                        attachment as u32,
+                        texture2.id(),
+                    )
+                }
+                ColorAttachment::None => {}
+            }
+        }
+        self.backend.draw_buffers(&draw_buffers);
+        Framebuffer::new(
+            id,
+            color_attachments,
+        )
     }
 
     /// Perform a draw call.
@@ -237,7 +304,7 @@ impl Factory {
         draw_call: &DrawCall,
         invocation: &Invocation,
     ) {
-        self.backend.bind_framebuffer(gl::FRAMEBUFFER, framebuffer.id());
+        self.backend.bind_framebuffer(framebuffer.id());
         if let Some(opt) = state.culling.as_gl_enum_if_enabled() {
             self.backend.enable(gl::CULL_FACE);
             self.backend.cull_face(opt);
@@ -245,7 +312,8 @@ impl Factory {
         } else {
             self.backend.disable(gl::CULL_FACE);
         }
-        self.backend.enable(gl::DEPTH_TEST);
+        self.backend.viewport(0, 0, 1920, 1080);
+        //self.backend.enable(gl::DEPTH_TEST);
         self.backend.depth_func(state.depth_test.as_gl_enum());
         self.backend.bind_vertex_array(vertex_array.id());
         self.backend.use_program(invocation.program.id());

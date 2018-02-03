@@ -12,6 +12,7 @@ pub mod draw_call;
 pub mod framebuffer;
 pub mod program;
 pub mod pipeline;
+pub mod renderbuffer;
 pub mod texture;
 pub mod vertex_array;
 
@@ -26,7 +27,7 @@ pub fn init<F>(query_proc_address: F) -> (Framebuffer, Factory)
     where F: FnMut(&str) -> *const os::raw::c_void
 {
     let factory = Factory::new(query_proc_address);
-    let framebuffer = Framebuffer::new(0);
+    let framebuffer = Framebuffer::implicit();
     (framebuffer, factory)
 }
 
@@ -49,6 +50,9 @@ pub use draw_call::Primitive;
 pub use factory::Factory;
 
 #[doc(inline)]
+pub use framebuffer::ColorAttachment;
+
+#[doc(inline)]
 pub use framebuffer::Framebuffer;
 
 #[doc(inline)]
@@ -59,6 +63,9 @@ pub use program::Program;
 
 #[doc(inline)]
 pub use pipeline::State;
+
+#[doc(inline)]
+pub use renderbuffer::Renderbuffer;
 
 #[doc(inline)]
 pub use texture::Sampler;

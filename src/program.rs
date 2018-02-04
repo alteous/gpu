@@ -4,10 +4,8 @@ use gl;
 use queue;
 use std::{cmp, ffi, fmt, hash, ops, sync};
 
-use ::ArrayVec;
 use buffer::Buffer;
-use framebuffer::MAX_COLOR_ATTACHMENTS;
-use texture::Sampler;
+use sampler::Sampler;
 
 /// Specifies the maximum number of uniforms permitted by the crate.
 pub const MAX_UNIFORM_BLOCKS: usize = 4;
@@ -18,25 +16,34 @@ pub const MAX_SAMPLERS: usize = 4;
 /// The program source code type.
 pub type Source = ffi::CStr;
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Interface {
     pub uniform_blocks: [UniformBlockBinding; MAX_UNIFORM_BLOCKS],
     pub samplers: [SamplerBinding; MAX_SAMPLERS],
-    pub color_attachments: [ColorAttachmentBinding; MAX_COLOR_ATTACHMENTS],
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum UniformBlockBinding {
-    Required(&'static u8),
+    Required(&'static [u8]),
     None,
 }
 
+impl Default for UniformBlockBinding {
+    fn default() -> Self {
+        UniformBlockBinding::None
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SamplerBinding {
-    Required(&'static u8),
+    Required(&'static [u8]),
     None,
 }
 
-pub enum ColorAttachmentBinding {
-    Required(&'static u8),
-    None,
+impl Default for SamplerBinding {
+    fn default() -> Self {
+        SamplerBinding::None
+    }
 }
 
 /// Determines the shader type, e.g. a vertex or fragment shader.
@@ -167,10 +174,10 @@ pub struct Invocation<'a> {
     pub program: &'a Program,
 
     /// Uniform buffers to be bound to the program at draw time.
-    pub uniforms: ArrayVec<[(u32, &'a Buffer); MAX_UNIFORM_BLOCKS]>,
+    pub uniforms: [Option<&'a Buffer>; MAX_UNIFORM_BLOCKS],
 
     /// Texture samplers to be bound to the program at draw time.
-    pub samplers: ArrayVec<[(u32, &'a Sampler); MAX_SAMPLERS]>,
+    pub samplers: [Option<&'a Sampler>; MAX_SAMPLERS],
 }
 
 /// A compiled shader program.
@@ -178,6 +185,9 @@ pub struct Invocation<'a> {
 pub struct Program {
     /// The OpenGL program ID.
     id: u32,
+
+    /// Locations of samplers.
+    pub(crate) samplers: [Option<u32>; MAX_SAMPLERS],
 
     /// Returns the program back to the factory upon destruction.
     _destructor: sync::Arc<ProgramDestructor>,
@@ -190,13 +200,14 @@ impl Program {
         tx: queue::Sender<Destroyed>,
     ) -> Self {
         Self {
+            id,
+            samplers: [None; MAX_SAMPLERS],
             _destructor: sync::Arc::new(
                 ProgramDestructor {
                     id,
                     tx,
                 },
             ),
-            id,
         }
     }
 

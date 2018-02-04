@@ -1,4 +1,4 @@
-//! Texture2 objects.
+//! GPU-visible pixel container.
 
 use gl;
 use queue;
@@ -7,9 +7,10 @@ use std::{cmp, fmt, hash, ops, sync};
 /// OpenGL texture ID type.
 pub type Id = u32;
 
-/// Format of pixel data.
+/// Format of texture data.
+#[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum PixelFormat {
+pub enum Format {
     /// Corresponds to `GL_RGB32F`.
     Rgb32f,
 
@@ -23,84 +24,19 @@ pub enum PixelFormat {
     Rgba8,
 }
 
-impl PixelFormat {
+impl Format {
     pub(crate) fn as_gl_enum(&self) -> u32 {
         match *self {
-            PixelFormat::Rgb32f => gl::RGB32F,
-            PixelFormat::Rgba32f => gl::RGBA32F,
-            PixelFormat::Rgb8 => gl::RGB8,
-            PixelFormat::Rgba8 => gl::RGBA8,
-        }
-    }
-}
-
-/// Pixel channel order.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ChannelOrder {
-    /// Corresponds to `GL_RED`.
-    R,
-
-    /// Corresponds to `GL_RG`.
-    Rg,
-
-    /// Corresponds to `GL_RGB`.
-    Rgb,
-
-    /// Corresponds to `GL_BGR`.
-    Bgr,
-
-    /// Corresponds to `GL_RGBA`.
-    Rgba,
-
-    /// Corresponds to `GL_BGRA`.
-    Bgra,
-}
-
-impl ChannelOrder {
-    pub(crate) fn as_gl_enum(&self) -> u32 {
-        match *self {
-            ChannelOrder::R => gl::RED,
-            ChannelOrder::Rg => gl::RG,
-            ChannelOrder::Rgb => gl::RGB,
-            ChannelOrder::Bgr => gl::BGR,
-            ChannelOrder::Rgba => gl::RGBA,
-            ChannelOrder::Bgra => gl::BGRA,
-        }
-    }
-}
-
-/// Texture filtering mode.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Filter {
-    /// Linear filter.
-    Linear,
-}
-
-impl Filter {
-    pub(crate) fn as_gl_enum(self) -> u32 {
-        match self {
-            Filter::Linear => gl::LINEAR,
-        }
-    }
-}
-
-/// Texture co-ordinate wrapping mode.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Wrap {
-    /// Repeat.
-    Repeat,
-}
-
-impl Wrap {
-    pub(crate) fn as_gl_enum(self) -> u32 {
-        match self {
-            Wrap::Repeat => gl::REPEAT,
+            Format::Rgb32f => gl::RGB32F,
+            Format::Rgba32f => gl::RGBA32F,
+            Format::Rgb8 => gl::RGB8,
+            Format::Rgba8 => gl::RGBA8,
         }
     }
 }
 
 /// Returns the texture back to the factory upon destruction.
-struct Destructor {
+pub(crate) struct Destructor {
     id: Id,
     tx: queue::Sender<Id>,
 }
@@ -108,116 +44,6 @@ struct Destructor {
 impl ops::Drop for Destructor {
     fn drop(&mut self) {
         let _ = self.tx.send(self.id);
-    }
-}
-
-#[derive(Clone)]
-pub struct Sampler {
-    /// The parent texture ID.
-    id: Id,
-
-    /// The texture kind (e.g. GL_TEXTURE_2D).
-    ty: u32,
-
-    /// Returns the parent texture back to the factory upon destruction.
-    _destructor: sync::Arc<Destructor>,
-}
-
-impl Sampler {
-    /// Construct a sampler from a 2D texture.
-    pub fn from_texture2(texture: Texture2) -> Self {
-        Self {
-            id: texture.id,
-            ty: gl::TEXTURE_2D,
-            _destructor: texture._destructor,
-        }
-    }
-
-    /// Returns the OpenGL ID of the parent texture.
-    pub(crate) fn id(&self) -> Id {
-        self.id
-    }
-
-    /// Returns the OpenGL texture type.
-    pub(crate) fn ty(&self) -> u32 {
-        self.ty
-    }
-}
-
-impl cmp::Eq for Sampler {}
-
-impl cmp::PartialEq<Self> for Sampler {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl fmt::Debug for Sampler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        #[derive(Debug)]
-        struct Sampler {
-            texture: Id,
-            kind: u32,
-        }
-
-        Sampler {
-            texture: self.id,
-            kind: self.ty,
-        }.fmt(f)
-    }
-}
-
-impl hash::Hash for Sampler {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-/// Builder for creating textures.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Builder {
-    /// Specifies whether mipmaps should be generated upon creation.
-    ///
-    /// Default: `true`.
-    pub generate_mipmaps: bool,
-
-    /// Specifies the magnification filter.
-    ///
-    /// Default: `Linear`.
-    pub mag_filter: Filter,
-
-    /// Specifies the minification filter.
-    ///
-    /// Default: `Linear`.
-    pub min_filter: Filter,
-
-    /// Specifies the wrapping mode for the S axis.
-    ///
-    /// Default: `Repeat`.
-    pub wrap_s: Wrap,
-
-    /// Specifies the wrapping mode for the T axis.
-    ///
-    /// Default: `Repeat`.
-    pub wrap_t: Wrap,
-}
-
-impl Builder {
-    /// Constructor.
-    pub fn new() -> Self {
-        Self {
-            generate_mipmaps: true,
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            wrap_s: Wrap::Repeat,
-            wrap_t: Wrap::Repeat,
-        }
-    }
-}
-
-impl Default for Builder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -229,10 +55,13 @@ pub struct Texture2 {
 
     width: u32,
     height: u32,
-    format: PixelFormat,
-    
+    format: Format,
+    mipmap: bool,
+
     /// Returns the texture back to the factory upon destruction.
-    _destructor: sync::Arc<Destructor>,
+    ///
+    /// Note: This is cloned by `Sampler`.
+    pub(crate) _destructor: sync::Arc<Destructor>,
 }
 
 impl Texture2 {
@@ -240,7 +69,8 @@ impl Texture2 {
         id: Id,
         width: u32,
         height: u32,
-        format: PixelFormat,
+        mipmap: bool,
+        format: Format,
         tx: queue::Sender<Id>,
     ) -> Self {
         Texture2 {
@@ -248,20 +78,34 @@ impl Texture2 {
             width,
             height,
             format,
+            mipmap,
             _destructor: sync::Arc::new(Destructor { id, tx }),
         }
     }
 
-    /// Constructs a new texture [`Builder`].
-    ///
-    /// [`Builder`]: struct.Builder.html
-    pub fn builder() -> Builder {
-        Builder::new()
+    /// Returns the OpenGL texture ID.
+    pub(crate) fn id(&self) -> Id {
+        self.id
     }
 
-    /// Returns the OpenGL texture ID.
-    pub fn id(&self) -> Id {
-        self.id
+    /// Returns the internal pixel format.
+    pub(crate) fn format(&self) -> Format {
+        self.format
+    }
+
+    /// Returns the width of the texture in pixels.
+    pub fn width(&self) -> usize {
+        self.width as _
+    }
+
+    /// Returns the height of the texture in pixels.
+    pub fn height(&self) -> usize {
+        self.height as _
+    }
+
+    /// Returns `true` if this texture has mipmaps.
+    pub fn mipmap(&self) -> bool {
+        self.mipmap
     }
 }
 

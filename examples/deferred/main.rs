@@ -3,11 +3,11 @@ extern crate glutin;
 extern crate gpu;
 extern crate image;
 
-use gpu::{buffer as buf, gl};
+use gpu::buffer as buf;
+use gpu::image as img;
+use gpu::texture as tex;
 use std::{ffi, fs, io, path};
 
-use gpu::buffer::Format;
-use gpu::texture::PixelFormat;
 use glutin::ElementState::Released;
 use glutin::Event;
 use glutin::GlContext;
@@ -23,14 +23,26 @@ struct Vertex {
     normal: [f32; 3],
 }
 
-const POSITION: Format = Format::Float { size: 3, bits: 32 };
-const NORMAL: Format = Format::Float { size: 3, bits: 32 };
+const POSITION: buf::Format = buf::Format::Float { size: 3, bits: 32 };
+const NORMAL: buf::Format = buf::Format::Float { size: 3, bits: 32 };
 
 const TRIANGLE_DATA: &'static [Vertex] = &[
     Vertex { position: [ -0.5, -0.5, 0.0 ], normal: [ 0.0, 0.0, 1.0 ] },
     Vertex { position: [ 0.5, -0.5, 0.0 ], normal: [ 0.0, 0.0, 1.0 ] },
     Vertex { position: [ 0.0, 0.5, 0.0 ], normal: [ 0.0, 0.0, 1.0 ] },
 ];
+
+const CLEAR: gpu::framebuffer::ClearOp = gpu::framebuffer::ClearOp {
+    color: gpu::framebuffer::ClearColor::Yes {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    },
+    depth: gpu::framebuffer::ClearDepth::Yes {
+        z: -1.0,
+    },
+};
 
 fn cstr<'a, T>(bytes: &'a T) -> &'a ffi::CStr
     where T: AsRef<[u8]>
@@ -64,7 +76,7 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let (framebuffer, factory) = gpu::init(|sym| {
+    let (_default_framebuffer, factory) = gpu::init(|sym| {
         window.get_proc_address(sym) as *const _
     });
 
@@ -94,7 +106,12 @@ fn main() {
             cstr(&source),
         )
     };
-    let program = factory.program(&vertex_shader, &fragment_shader);
+    let interface = gpu::program::Interface::default();
+    let program = factory.program(
+        &vertex_shader,
+        &fragment_shader,
+        &interface,
+    );
 
     let draw_call = gpu::DrawCall {
         mode: gpu::Mode::Arrays,
@@ -104,14 +121,14 @@ fn main() {
     };
     let invocation = gpu::program::Invocation {
         program: &program,
-        uniforms: gpu::ArrayVec::new(),
-        samplers: gpu::ArrayVec::new(),
+        uniforms: [None; gpu::program::MAX_UNIFORM_BLOCKS],
+        samplers: [None; gpu::program::MAX_SAMPLERS],
     };
     let (width, height) = (1920, 1080);
-    let format = PixelFormat::Rgb32f;
-    let position_target = factory.texture2(width, height, format);
-    let format = PixelFormat::Rgb8;
-    let normal_target = factory.texture2(width, height, format);
+    let format = tex::Format::Rgb32f;
+    let position_target = factory.texture2(width, height, false, format);
+    let format = tex::Format::Rgb8;
+    let normal_target = factory.texture2(width, height, false, format);
     let color_attachments = [
         gpu::framebuffer::ColorAttachment::Texture2(position_target.clone()),
         gpu::framebuffer::ColorAttachment::Texture2(normal_target.clone()),
@@ -140,8 +157,17 @@ fn main() {
                 _ => {}
             }
         });
-        
-        let state = gpu::pipeline::State::default();
+
+        factory.clear(&framebuffer, CLEAR);
+        let state = gpu::pipeline::State {
+            viewport: gpu::pipeline::Viewport {
+                x: 0,
+                y: 0,
+                w: 1920,
+                h: 1080,
+            },
+            .. Default::default()
+        };
         factory.draw(
             &framebuffer,
             &state,
@@ -150,15 +176,12 @@ fn main() {
             &invocation,
         );
         window.swap_buffers().unwrap();
-
-        println!("break");
-        break;
     }
 
     let mut buffer = vec![0u8; 1920 * 1080 * 3];
     factory.read_texture2(
         &normal_target,
-        (gl::RGB, gl::UNSIGNED_BYTE),
+        img::U8::Rgb,
         &mut buffer,
     );
     image::save_buffer(

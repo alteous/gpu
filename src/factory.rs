@@ -4,18 +4,25 @@
 
 use buffer;
 use gl;
+use image;
 use program;
 use std::{ffi, mem, os, ptr};
 use texture;
+use util;
 use vertex_array;
 
 use draw_call::{DrawCall, Mode};
-use framebuffer::{ColorAttachment, Framebuffer, MAX_COLOR_ATTACHMENTS};
-use program::Invocation;
-use pipeline::{PolygonMode, State};
+use framebuffer::{ColorAttachment, ClearOp, ClearColor, ClearDepth, Framebuffer, MAX_COLOR_ATTACHMENTS};
+use program::{
+    Invocation,
+    UniformBlockBinding,
+    SamplerBinding,
+    MAX_UNIFORM_BLOCKS,
+    MAX_SAMPLERS,
+};
+use pipeline::{PolygonMode, State, Viewport};
 use queue::Queue;
 use renderbuffer::Renderbuffer;
-use texture::PixelFormat;
 use {Buffer, Program, Texture2, VertexArray};
 
 /// OpenGL memory manager.
@@ -52,13 +59,24 @@ impl Factory {
     }
 
     /// Clear the color buffer.
-    pub fn clear_color_buffer(&self, r: f32, g: f32, b: f32, a: f32) {
-        self.backend.clear_color(r, g, b, a);
-    }
-
-    /// Clear the depth buffer.
-    pub fn clear_depth_buffer(&self) {
-        self.backend.clear_depth();
+    pub fn clear(&self, framebuffer: &Framebuffer, op: ClearOp) {
+        self.backend.bind_framebuffer(framebuffer.id());
+        let mut ops = 0;
+        match op.color {
+            ClearColor::Yes { r, g, b, a } => {
+                self.backend.clear_color(r, g, b, a);
+                ops |= gl::COLOR_BUFFER_BIT;
+            }
+            ClearColor::No => {}
+        }
+        match op.depth {
+            ClearDepth::Yes { z } => {
+                self.backend.clear_depth(z);
+                ops |= gl::DEPTH_BUFFER_BIT;
+            }
+            ClearDepth::No => {}
+        }
+        self.backend.clear(ops);
     }
 
     /// (Re)-initialize the contents of a [`Buffer`].
@@ -139,25 +157,53 @@ impl Factory {
         &self,
         vertex: &program::Object,
         fragment: &program::Object,
+        interface: &program::Interface,
     ) -> Program {
         let id = self.backend.create_program();
         self.backend.attach_shader(id, vertex.id());
         self.backend.attach_shader(id, fragment.id());
         self.backend.link_program(id);
         let tx = self.program_queue.tx();
-        Program::new(id, tx)
+        let mut program = Program::new(id, tx);
+        for binding in 0 .. MAX_UNIFORM_BLOCKS {
+            match interface.uniform_blocks[binding] {
+                UniformBlockBinding::Required(name) => {
+                    let cstr = util::cstr(name);
+                    let index = self
+                        .query_uniform_block_index(&program, cstr)
+                        .expect("missing required uniform block index");
+                    self.set_uniform_block_binding(
+                        &program,
+                        index,
+                        binding as u32,
+                    );
+                }
+                UniformBlockBinding::None => {}
+            }
+        }
+        for binding in 0 .. MAX_SAMPLERS {
+            match interface.samplers[binding] {
+                SamplerBinding::Required(name) => {
+                    let cstr = util::cstr(name);
+                    let index = self
+                        .query_uniform_index(&program, cstr)
+                        .expect("missing required sampler index");
+                    program.samplers[binding] = Some(index);
+                }
+                SamplerBinding::None => {}
+            }
+        }
+        program
     }
 
     /// Sets the binding index for a named uniform block.
     pub fn set_uniform_block_binding(
         &self,
         program: &Program,
-        name: &ffi::CStr,
+        index: u32,
         binding: u32,
     ) {
-        if let Some(index) = self.query_uniform_block_index(program, name) {
-            self.backend.uniform_block_binding(program.id(), index, binding);
-        }
+        self.backend.uniform_block_binding(program.id(), index, binding);
     }
 
     /// Retrieves the index of a named uniform block.
@@ -189,7 +235,8 @@ impl Factory {
         &self,
         width: u32,
         height: u32,
-        format: PixelFormat,
+        mipmap: bool,
+        format: texture::Format,
     ) -> Texture2 {
         let id = self.backend.gen_texture();
         let tx = self.texture_queue.tx();
@@ -201,26 +248,32 @@ impl Factory {
             height as _,
             gl::RGBA,
             gl::UNSIGNED_BYTE,
-            ptr::null() as *const _,
+            ptr::null() as _,
         );
+        if mipmap {
+            self.backend.generate_mipmap(gl::TEXTURE_2D);
+        }
         self.backend.bind_texture(gl::TEXTURE_2D, 0);
-        Texture2::new(id, width, height, format, tx)
+        Texture2::new(id, width, height, mipmap, format, tx)
     }
 
     /// Read back the contents of a [`Texture2`].
     ///
     /// [`Texture2`]: texture/struct.Texture2.html
-    pub fn read_texture2<T>(
+    pub fn read_texture2<F, T>(
         &self,
         texture: &Texture2,
-        format: (u32, u32),
+        format: F,
         contents: &mut [T],
-    ) {
+    )
+        where image::Format: From<F>
+    {
         self.backend.bind_texture(gl::TEXTURE_2D, texture.id());
+        let (type_, format) = image::Format::from(format).as_gl_enums();
         self.backend.get_tex_image(
             gl::TEXTURE_2D,
-            format.0,
-            format.1,
+            format,
+            type_,
             contents.as_mut_ptr() as *mut _,
         );
     }
@@ -228,28 +281,26 @@ impl Factory {
     /// (Re)-initialize the contents of a [`Texture2`].
     ///
     /// [`Texture2`]: texture/struct.Texture2.html
-    pub fn initialize_texture2<T>(
+    pub fn write_texture2<F, T>(
         &self,
         texture: &Texture2,
-        generate_mipmap: bool,
-        internal_format: u32,
-        width: u32,
-        height: u32,
-        format: u32,
-        ty: u32,
+        format: F,
         data: &[T],
-    ) {
+    )
+        where image::Format: From<F>
+    {
         self.backend.bind_texture(gl::TEXTURE_2D, texture.id());
+        let (type_, format) = image::Format::from(format).as_gl_enums();
         self.backend.tex_image_2d(
             gl::TEXTURE_2D,
-            internal_format,
-            width,
-            height,
+            texture.format().as_gl_enum(),
+            texture.width() as u32,
+            texture.height() as u32,
             format,
-            ty,
+            type_,
             data.as_ptr() as *const _,
         );
-        if generate_mipmap {
+        if texture.mipmap() {
             self.backend.generate_mipmap(gl::TEXTURE_2D);
         }
         self.backend.bind_texture(gl::TEXTURE_2D, 0);
@@ -305,6 +356,10 @@ impl Factory {
         invocation: &Invocation,
     ) {
         self.backend.bind_framebuffer(framebuffer.id());
+        {
+            let Viewport { x, y, w, h } = state.viewport;
+            self.backend.viewport(x, y, w, h);
+        }
         if let Some(opt) = state.culling.as_gl_enum_if_enabled() {
             self.backend.enable(gl::CULL_FACE);
             self.backend.cull_face(opt);
@@ -312,17 +367,45 @@ impl Factory {
         } else {
             self.backend.disable(gl::CULL_FACE);
         }
-        self.backend.viewport(0, 0, 1920, 1080);
-        //self.backend.enable(gl::DEPTH_TEST);
+        self.backend.enable(gl::DEPTH_TEST);
         self.backend.depth_func(state.depth_test.as_gl_enum());
         self.backend.bind_vertex_array(vertex_array.id());
         self.backend.use_program(invocation.program.id());
-        for &(idx, buf) in &invocation.uniforms {
-            self.backend.bind_buffer_base(gl::UNIFORM_BUFFER, idx, buf.id());
+        for (idx, opt) in invocation.uniforms.iter().enumerate() {
+            opt.map(|buf| {
+                self.backend.bind_buffer_base(
+                    gl::UNIFORM_BUFFER,
+                    idx as u32,
+                    buf.id(),
+                );
+            });
         }
-        for &(idx, sampler) in &invocation.samplers {
-            self.backend.active_texture(idx);
-            self.backend.bind_texture(sampler.ty(), sampler.id());
+        for (idx, opt) in invocation.samplers.iter().enumerate() {
+            opt.map(|sampler| {
+                let (id, ty) = (sampler.id(), sampler.ty());
+                self.backend.active_texture(idx as u32);
+                self.backend.bind_texture(ty, id);
+                self.backend.tex_parameteri(
+                    ty,
+                    gl::TEXTURE_MAG_FILTER,
+                    sampler.mag_filter.as_gl_enum(),
+                );
+                self.backend.tex_parameteri(
+                    ty,
+                    gl::TEXTURE_MIN_FILTER,
+                    sampler.min_filter.as_gl_enum(),
+                );
+                self.backend.tex_parameteri(
+                    ty,
+                    gl::TEXTURE_WRAP_S,
+                    sampler.wrap_s.as_gl_enum(),
+                );
+                self.backend.tex_parameteri(
+                    ty,
+                    gl::TEXTURE_WRAP_T,
+                    sampler.wrap_t.as_gl_enum(),
+                );
+            });
         }
         self.backend.polygon_mode(gl::FRONT_AND_BACK, state.polygon_mode.as_gl_enum());
         match state.polygon_mode {

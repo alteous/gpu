@@ -1,25 +1,24 @@
-extern crate arrayvec;
 extern crate crossbeam_channel;
 #[macro_use] extern crate log;
 extern crate vec_map;
 
 mod factory;
 mod queue;
-pub mod gl;
+mod gl;
 
 pub mod buffer;
 pub mod draw_call;
 pub mod framebuffer;
+pub mod image;
 pub mod program;
 pub mod pipeline;
 pub mod renderbuffer;
+pub mod sampler;
 pub mod texture;
+mod util;
 pub mod vertex_array;
 
 use std::os;
-
-/// Fixed size vector type.
-pub type ArrayVec<T> = arrayvec::ArrayVec<T>;
 
 /// Initialize the library, creating a default framebuffer to render to and
 /// a factory to instantiate library objects.
@@ -68,10 +67,10 @@ pub use pipeline::State;
 pub use renderbuffer::Renderbuffer;
 
 #[doc(inline)]
-pub use texture::Sampler;
+pub use texture::Texture2;
 
 #[doc(inline)]
-pub use texture::Texture2;
+pub use sampler::Sampler;
 
 #[doc(inline)]
 pub use vertex_array::VertexArray;

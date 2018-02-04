@@ -117,6 +117,22 @@ impl Culling {
     }
 }
 
+/// Viewport region to render to.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct Viewport {
+    /// X offset.
+    pub x: u32,
+
+    /// Y offset.
+    pub y: u32,
+
+    /// Width.
+    pub w: u32,
+
+    /// Height.
+    pub h: u32,
+}
+
 /// Fixed-function state parameters.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct State {
@@ -131,4 +147,7 @@ pub struct State {
 
     /// Specifies the polygon rasterization method.
     pub polygon_mode: PolygonMode,
+
+    /// Specifies region to render to.
+    pub viewport: Viewport,
 }

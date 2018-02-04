@@ -28,6 +28,28 @@ pub struct Framebuffer {
     color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ClearColor {
+    Yes { r: f32, g: f32, b: f32, a: f32 },
+    No,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ClearDepth {
+    Yes { z: f64 },
+    No,
+}
+
+/// Clear operation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClearOp {
+    /// Clear color.
+    pub color: ClearColor,
+
+    /// Depth value.
+    pub depth: ClearDepth,
+}
+
 impl Framebuffer {
     /// Constructor.
     ///
@@ -44,14 +66,14 @@ impl Framebuffer {
 
     /// Returns the implicit framebuffer object.
     pub(crate) fn implicit() -> Self {
-        Self {
-            id: 0,
-            color_attachments: [
+        Self::new(
+            0,
+            [
                 ColorAttachment::Renderbuffer(Renderbuffer::implicit()),
                 ColorAttachment::None,
                 ColorAttachment::None,
             ],
-        }
+        )
     }
 
     /// Returns the OpenGL framebuffer ID.

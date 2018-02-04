@@ -2,10 +2,10 @@ extern crate env_logger;
 extern crate glutin;
 extern crate gpu;
 
-use gpu::gl;
 use std::{ffi, fs, io, path};
 
 use gpu::buffer::Format;
+use gpu::program::{Interface, SamplerBinding, UniformBlockBinding};
 
 use glutin::ElementState::Released;
 use glutin::Event;
@@ -23,6 +23,21 @@ struct UniformBlock {
     color: [f32; 4],
 }
 
+const INTERFACE: Interface = Interface {
+    uniform_blocks: [
+        UniformBlockBinding::Required(b"b_Locals\0"),
+        UniformBlockBinding::None,
+        UniformBlockBinding::None,
+        UniformBlockBinding::None,
+    ],
+    samplers: [
+        SamplerBinding::Required(b"u_Sampler\0"),
+        SamplerBinding::None,
+        SamplerBinding::None,
+        SamplerBinding::None,
+    ],   
+};
+
 const POSITION_FORMAT: Format = Format::Float { size: 3, bits: 32 };
 
 const TRIANGLE_DATA: &'static [Vertex] = &[
@@ -35,7 +50,7 @@ const YELLOW: &'static [UniformBlock] = &[
     UniformBlock { color: [1.0, 1.0, 1.0, 1.0] },
 ];
 
-const GREEN_PIXEL: &'static [u32] = &[0x00FFFF];
+const GREEN_PIXEL: &'static [u8] = &[0, 255, 0, 0];
 
 fn cstr<'a, T>(bytes: &'a T) -> &'a ffi::CStr
     where T: AsRef<[u8]>
@@ -69,37 +84,29 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let factory = gpu::Factory::new(|sym| {
+    let (framebuffer, factory) = gpu::init(|sym| {
         window.get_proc_address(sym) as *const _
     });
 
-    let vertex_shader = {
-        let mut source = read_file_to_end("examples/triangle/shader.vert").unwrap();
+    let vert_shader = {
+        let mut source = read_file_to_end("examples/triangle/shader.vert")
+            .expect("I/O error");
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Vertex,
             cstr(&source),
         )
     };
-    let fragment_shader = {
-        let mut source = read_file_to_end("examples/triangle/shader.frag").unwrap();
+    let frag_shader = {
+        let mut source = read_file_to_end("examples/triangle/shader.frag")
+            .expect("I/O error");
         source.push(0);
         factory.program_object(
             gpu::program::Kind::Fragment,
             cstr(&source),
         )
     };
-    let (program, block_binding, sampler_binding) = {
-        let prog = factory.program(
-            &vertex_shader,
-            &fragment_shader,
-        );
-        let bname = cstr(b"UniformBlock\0");
-        let bbinding = factory.query_uniform_block_index(&prog, bname);
-        let sname = cstr(b"u_Sampler\0");
-        let sbinding = factory.query_uniform_index(&prog, sname);
-        (prog, bbinding.unwrap(), sbinding.unwrap())
-    };
+    let program = factory.program(&vert_shader, &frag_shader, &INTERFACE);
 
     let vertex_buffer = factory.buffer(gpu::buffer::Kind::Array, gpu::buffer::Usage::StaticDraw);
     factory.initialize_buffer(&vertex_buffer, TRIANGLE_DATA);
@@ -112,17 +119,8 @@ fn main() {
     vertex_array_builder.attributes.insert(0, position_accessor);
     let vertex_array = factory.vertex_array(vertex_array_builder);
 
-    let texture = factory.texture2(Default::default());
-    factory.initialize_texture2(
-        &texture,
-        true,
-        gl::RGBA8,
-        1,
-        1,
-        gl::BGRA,
-        gl::UNSIGNED_INT_8_8_8_8_REV,
-        GREEN_PIXEL,
-    );
+    let texture = factory.texture2(1, 1, true, gpu::texture::Format::Rgba8);
+    factory.write_texture2(&texture, gpu::image::U8::Rgba, GREEN_PIXEL);
     let sampler = gpu::Sampler::from_texture2(texture);
 
     let draw_call = gpu::DrawCall {
@@ -131,18 +129,26 @@ fn main() {
         offset: 0,
         count: 3,
     };
-    let mut invocation = gpu::program::Invocation {
+    let invocation = gpu::program::Invocation {
         program: &program,
-        uniforms: gpu::ArrayVec::new(),
-        samplers: gpu::ArrayVec::new(),
+        uniforms: [Some(&uniform_buffer), None, None, None],
+        samplers: [Some(&sampler), None, None, None],
     };
-    invocation.uniforms.push((block_binding, &uniform_buffer));
-    invocation.samplers.push((sampler_binding, &sampler));
 
     let mut running = true;
     while running {
         window.swap_buffers().unwrap();
-        factory.draw(&vertex_array, &draw_call, &invocation);
+        let (width, height) = window.get_inner_size().unwrap();
+        let state = gpu::pipeline::State {
+            viewport: gpu::pipeline::Viewport {
+                x: 0,
+                y: 0,
+                w: width,
+                h: height,
+            },
+            .. Default::default()
+        };
+        factory.draw(&framebuffer, &state, &vertex_array, &draw_call, &invocation);
         event_loop.poll_events(|event| {
             match event {
                 Event::WindowEvent { event, .. } => {

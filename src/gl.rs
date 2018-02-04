@@ -29,25 +29,31 @@ impl Backend {
 
     // Pipeline state operations
 
-    /// Corresponds to `glClearColor + glClear(GL_COLOR_BUFFER_BIT)`.
-    pub fn clear_color(&self, r: f32, g: f32, b: f32, a: f32) {
+    /// Corresponds to `glClear`.
+    pub fn clear(&self, ops: u32) {
+        trace!(target: "gl", "glClear{:?}", (ops,));
         unsafe {
-            trace!(target: "gl", "glClearColor{:?}", (r, g, b, a));
-            self.gl.ClearColor(r, g, b, a);
-            self.check_error();
-            trace!(target: "gl", "glClear(GL_COLOR_BUFFER_BIT)");
-            self.gl.Clear(COLOR_BUFFER_BIT);
-            self.check_error();
+            self.gl.Clear(ops);
         }
+        self.check_error();
     }
 
-    /// Corresponds to `glClear(GL_DEPTH_BUFFER_BIT)`.
-    pub fn clear_depth(&self) {
+    /// Corresponds to `glClearColor`.
+    pub fn clear_color(&self, r: f32, g: f32, b: f32, a: f32) {
+        trace!(target: "gl", "glClearColor{:?}", (r, g, b, a));
         unsafe {
-            trace!(target: "gl", "glClear(GL_DEPTH_BUFFER_BIT)");
-            self.gl.Clear(DEPTH_BUFFER_BIT);
-            self.check_error();
+            self.gl.ClearColor(r, g, b, a);
         }
+        self.check_error();
+    }
+
+    /// Corresponds to `glClearDepth`.
+    pub fn clear_depth(&self, z: f64) {
+        trace!(target: "gl", "glClearDepth{:?}", (z,));
+        unsafe {
+            self.gl.ClearDepth(z);
+        }
+        self.check_error();
     }
 
     /// Corresponds to `glEnable`.

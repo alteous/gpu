@@ -47,7 +47,7 @@ impl ops::Drop for Destructor {
     }
 }
 
-/// A 2D texture object.
+/// GPU-visible 2D texture.
 #[derive(Clone)]
 pub struct Texture2 {
     /// The OpenGL texture ID.

@@ -1,3 +1,5 @@
+//! Lean OpenGL 3.2 wrapper library.
+
 extern crate crossbeam_channel;
 #[macro_use] extern crate log;
 extern crate vec_map;
@@ -40,16 +42,7 @@ pub use buffer::Buffer;
 pub use draw_call::DrawCall;
 
 #[doc(inline)]
-pub use draw_call::Mode;
-
-#[doc(inline)]
-pub use draw_call::Primitive;
-
-#[doc(inline)]
 pub use factory::Factory;
-
-#[doc(inline)]
-pub use framebuffer::ColorAttachment;
 
 #[doc(inline)]
 pub use framebuffer::Framebuffer;

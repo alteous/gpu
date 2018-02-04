@@ -11,7 +11,7 @@ use texture;
 use util;
 use vertex_array;
 
-use draw_call::{DrawCall, Mode};
+use draw_call::{DrawCall, Kind};
 use framebuffer::{ColorAttachment, ClearOp, ClearColor, ClearDepth, Framebuffer, MAX_COLOR_ATTACHMENTS};
 use program::{
     Invocation,
@@ -413,21 +413,21 @@ impl Factory {
             PolygonMode::Line(width) => self.backend.line_width(width as f32),
             PolygonMode::Fill => {},
         }
-        match draw_call.mode {
-            Mode::Arrays => {
+        match draw_call.kind {
+            Kind::Arrays => {
                 let mode = draw_call.primitive.as_gl_enum();
                 self.backend.draw_arrays(mode, draw_call.offset, draw_call.count);
             },
-            Mode::ArraysInstanced(_) => {
+            Kind::ArraysInstanced(_) => {
                 unimplemented!()
             },
-            Mode::Elements => {
+            Kind::Elements => {
                 let mode = draw_call.primitive.as_gl_enum();
                 let accessor = vertex_array.indices().unwrap();
                 let format = accessor.format().gl_data_type();
                 self.backend.draw_elements(mode, draw_call.offset, draw_call.count, format);
             },
-            Mode::ElementsInstanced(_) => {
+            Kind::ElementsInstanced(_) => {
                 unimplemented!()
             },
         }

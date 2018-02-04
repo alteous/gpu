@@ -124,8 +124,8 @@ fn main() {
     let sampler = gpu::Sampler::from_texture2(texture);
 
     let draw_call = gpu::DrawCall {
-        mode: gpu::Mode::Arrays,
-        primitive: gpu::Primitive::Triangles,
+        kind: gpu::draw_call::Kind::Arrays,
+        primitive: gpu::draw_call::Primitive::Triangles,
         offset: 0,
         count: 3,
     };
@@ -133,7 +133,7 @@ fn main() {
         program: &program,
         uniforms: [Some(&uniform_buffer), None, None, None],
         samplers: [Some(&sampler), None, None, None],
-    };
+    };2
 
     let mut running = true;
     while running {

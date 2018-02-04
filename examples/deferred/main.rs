@@ -114,8 +114,8 @@ fn main() {
     );
 
     let draw_call = gpu::DrawCall {
-        mode: gpu::Mode::Arrays,
-        primitive: gpu::Primitive::Triangles,
+        kind: gpu::draw_call::Kind::Arrays,
+        primitive: gpu::draw_call::Primitive::Triangles,
         offset: 0,
         count: 3,
     };

@@ -1,3 +1,5 @@
+//! GPU-visible pixel container optimized as a render target.
+
 pub(crate) type Id = u32;
 
 /// Buffer optimized as a render target.

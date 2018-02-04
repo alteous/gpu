@@ -1,3 +1,5 @@
+//! Graphics pipeline states.
+
 use gl;
 
 /// Specifies the polygon rasterization method.

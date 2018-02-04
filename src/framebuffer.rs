@@ -1,3 +1,5 @@
+//! Rendering targets.
+
 use std::{cmp, fmt, hash};
 
 use renderbuffer::Renderbuffer;

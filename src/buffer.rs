@@ -208,74 +208,93 @@ impl<'a> Slice<'a> {
 /// Describes the data format of an individual item in an accessor.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Format {
-    /// Specifies a floating point type.
-    Float {
-        /// The number of bits in each element, e.g. 32.
-        bits: u8,
-        /// The number of elements, e.g. 3 for `vec3`.
-        size: u8,
-    },
+    /// 32-bit floating point number.
+    F32(u8),
 
-    /// Specifies a signed integer type.
-    Signed {
-        /// The number of bits in each element, e.g. 32.
-        bits: u8,
-        /// Specifies whether this is a normalized integer type.
-        norm: bool,
-        /// The number of elements, e.g. 3 for `ivec3` or `vec3`.
-        size: u8,
-    },
+    /// Signed 8-bit integer.
+    I8(u8),
 
-    /// Specifies an unsigned integer type.
-    Unsigned {
-        /// The number of bits in each element, e.g. 32.
-        bits: u8,
-        /// Specifies whether this is a normalized integer type.
-        norm: bool,
-        /// The number of elements, e.g. 3 for `uvec3` or `vec3`.
-        size: u8,
-    },
+    /// Signed normalized 8-bit rational.
+    I8Norm(u8),
+
+    /// Signed 16-bit integer.
+    I16(u8),
+
+    /// Signed normalized 16-bit rational.
+    I16Norm(u8),
+
+    /// Signed 32-bit integer.
+    I32(u8),
+
+    /// Signed 32-bit normalized rational.
+    I32Norm(u8),
+
+    /// Unsigned 8-bit integer.
+    U8(u8),
+
+    /// Unsigned normalized 8-bit rational.
+    U8Norm(u8),
+
+    /// Unsigned 16-bit integer.
+    U16(u8),
+
+    /// Unsigned normalized 16-bit rational.
+    U16Norm(u8),
+    
+    /// Unsigned 32-bit integer.
+    U32(u8),
+
+    /// Unsigned normalized 32-bit rational.
+    U32Norm(u8),
 }
 
 impl Format {
     /// Returns the corresponding GL data type enumeration constant.
     pub(crate) fn gl_data_type(self) -> u32 {
         match self {
-            Format::Float { bits: 32, .. } => gl::FLOAT,
-            Format::Signed { bits: 8, .. } => gl::BYTE,
-            Format::Signed { bits: 16, .. } => gl::SHORT,
-            Format::Signed { bits: 32, .. } => gl::INT,
-            Format::Unsigned { bits: 8, .. } => gl::UNSIGNED_BYTE,
-            Format::Unsigned { bits: 16, .. } => gl::UNSIGNED_SHORT,
-            Format::Unsigned { bits: 32, .. } => gl::UNSIGNED_INT,
-            _ => panic!("Invalid GL format {:?}", self),
-        }
-    }
-
-    /// Returns the width of each element in bits.
-    pub fn bits(self) -> u8 {
-        match self {
-            Format::Signed { bits, .. } => bits,
-            Format::Unsigned { bits, .. } => bits,
-            Format::Float { bits, .. } => bits,
+            Format::F32(_) => gl::FLOAT,
+            Format::I8(_) | Format::I8Norm(_) => gl::BYTE,
+            Format::I16(_) | Format::I16Norm(_) => gl::SHORT,
+            Format::I32(_) | Format::I32Norm(_) => gl::INT,
+            Format::U8(_) | Format::U8Norm(_) => gl::UNSIGNED_BYTE,
+            Format::U16(_) | Format::U16Norm(_) => gl::UNSIGNED_SHORT,
+            Format::U32(_) | Format::U32Norm(_) => gl::UNSIGNED_INT,
         }
     }
 
     /// Returns true if this is a normalized type.
     pub fn norm(self) -> bool {
         match self {
-            Format::Signed { norm, .. } => norm,
-            Format::Unsigned { norm, .. } => norm,
+            Format::I8Norm(_)
+                | Format::I16Norm(_)
+                | Format::I32Norm(_)
+                | Format::U8Norm(_)
+                | Format::U16Norm(_)
+                | Format::U32Norm(_) => true,
             _ => false,
         }
     }
 
     /// Returns the number of elements.
     pub fn size(self) -> usize {
-        match self {
-            Format::Float { size, .. } => size as usize,
-            Format::Signed { size, .. } => size as usize,
-            Format::Unsigned { size, .. } => size as usize,
+        let size = match self {
+            Format::F32(size) => size,
+            Format::I8(size) => size,
+            Format::I8Norm(size) => size,
+            Format::I16(size) => size,
+            Format::I16Norm(size) => size,
+            Format::I32(size) => size,
+            Format::I32Norm(size) => size,
+            Format::U8(size) => size,
+            Format::U8Norm(size) => size,
+            Format::U16(size) => size,
+            Format::U16Norm(size) => size,
+            Format::U32(size) => size,
+            Format::U32Norm(size) => size,            
+        };
+        match size {
+            1 | 2 | 3 | 4 => size as usize,
+            _ => panic!("invalid buffer format size"),
         }
     }
 }

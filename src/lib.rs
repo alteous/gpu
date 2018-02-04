@@ -5,8 +5,9 @@ extern crate crossbeam_channel;
 extern crate vec_map;
 
 mod factory;
-mod queue;
 mod gl;
+mod queue;
+mod util;
 
 pub mod buffer;
 pub mod draw_call;
@@ -16,8 +17,8 @@ pub mod program;
 pub mod pipeline;
 pub mod renderbuffer;
 pub mod sampler;
+pub mod shader;
 pub mod texture;
-mod util;
 pub mod vertex_array;
 
 use std::os;

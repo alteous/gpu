@@ -5,10 +5,9 @@ use queue;
 use std::{cmp, fmt, hash, ops, sync};
 
 /// OpenGL texture ID type.
-pub type Id = u32;
+pub(crate) type Id = u32;
 
 /// Format of texture data.
-#[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Format {
     /// Corresponds to `GL_RGB32F`.

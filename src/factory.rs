@@ -6,13 +6,21 @@ use buffer;
 use gl;
 use image;
 use program;
+use shader;
 use std::{ffi, mem, os, ptr};
 use texture;
 use util;
 use vertex_array;
 
 use draw_call::{DrawCall, Kind};
-use framebuffer::{ColorAttachment, ClearOp, ClearColor, ClearDepth, Framebuffer, MAX_COLOR_ATTACHMENTS};
+use framebuffer::{
+    ColorAttachment,
+    ClearOp,
+    ClearColor,
+    ClearDepth,
+    Framebuffer,
+    MAX_COLOR_ATTACHMENTS,
+};
 use program::{
     Invocation,
     UniformBlockBinding,
@@ -109,22 +117,26 @@ impl Factory {
     }
 
     /// A collection of GPU buffers that may be drawn with a material.
-    pub fn vertex_array(&self, builder: vertex_array::Builder) -> VertexArray {
+    pub fn vertex_array(
+        &self,
+        attributes: [Option<vertex_array::Attribute>; vertex_array::MAX_ATTRIBUTES],
+        indices: Option<vertex_array::Indices>,
+    ) -> VertexArray {
         let id = self.backend.gen_vertex_array();
         let tx = self.vertex_array_queue.tx();
 
         // Setup the vertex array
         {
             self.backend.bind_vertex_array(id);
-            if let Some(ref accessor) = builder.indices {
+            if let Some(ref accessor) = indices {
                 self.backend.bind_buffer(accessor.buffer().id(), gl::ELEMENT_ARRAY_BUFFER);
             }
-            for idx in 0 .. vertex_array::MAX_ATTRIBUTES {
-                if let Some(ref accessor) = builder.attributes.get(idx) {
+            for binding in 0 .. vertex_array::MAX_ATTRIBUTES {
+                if let Some(ref accessor) = attributes[binding] {
                     self.backend.bind_buffer(accessor.buffer().id(), gl::ARRAY_BUFFER);
-                    self.backend.enable_vertex_attrib_array(idx as _);
+                    self.backend.enable_vertex_attrib_array(binding as _);
                     self.backend.vertex_attrib_pointer(
-                        idx as u8,
+                        binding as u8,
                         accessor.format().size() as _,
                         accessor.format().gl_data_type(),
                         accessor.format().norm(),
@@ -136,28 +148,28 @@ impl Factory {
             self.backend.bind_vertex_array(0);
         }
 
-        VertexArray::new(id, builder, tx)
+        VertexArray::new(id, attributes, indices, tx)
     }
 
-    /// Compile a GLSL object.
-    pub fn program_object(
+    /// Compile GLSL shader code into a shader object.
+    pub fn shader(
         &self,
-        kind: program::Kind,
-        sources: &program::Source,
-    ) -> program::Object {
+        kind: shader::Kind,
+        sources: &shader::Source,
+    ) -> shader::Object {
         let id = self.backend.create_shader(kind.as_gl_enum());
         self.backend.shader_source(id, sources);
         self.backend.compile_shader(id);
         let tx = self.program_queue.tx();
-        program::Object::new(id, kind, tx)
+        shader::Object::new(id, kind, tx)
     }
 
     /// Link GLSL objects to create a GLSL program.
     pub fn program(
         &self,
-        vertex: &program::Object,
-        fragment: &program::Object,
-        interface: &program::Interface,
+        vertex: &shader::Object,
+        fragment: &shader::Object,
+        bindings: &program::Bindings,
     ) -> Program {
         let id = self.backend.create_program();
         self.backend.attach_shader(id, vertex.id());
@@ -166,7 +178,7 @@ impl Factory {
         let tx = self.program_queue.tx();
         let mut program = Program::new(id, tx);
         for binding in 0 .. MAX_UNIFORM_BLOCKS {
-            match interface.uniform_blocks[binding] {
+            match bindings.uniform_blocks[binding] {
                 UniformBlockBinding::Required(name) => {
                     let cstr = util::cstr(name);
                     let index = self
@@ -182,7 +194,7 @@ impl Factory {
             }
         }
         for binding in 0 .. MAX_SAMPLERS {
-            match interface.samplers[binding] {
+            match bindings.samplers[binding] {
                 SamplerBinding::Required(name) => {
                     let cstr = util::cstr(name);
                     let index = self

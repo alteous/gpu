@@ -3,10 +3,12 @@ extern crate glutin;
 extern crate gpu;
 extern crate image;
 
+mod util;
+
 use gpu::buffer as buf;
 use gpu::image as img;
 use gpu::texture as tex;
-use std::{ffi, fs, io, path};
+use std::io;
 
 use glutin::ElementState::Released;
 use glutin::Event;
@@ -23,8 +25,8 @@ struct Vertex {
     normal: [f32; 3],
 }
 
-const POSITION: buf::Format = buf::Format::Float { size: 3, bits: 32 };
-const NORMAL: buf::Format = buf::Format::Float { size: 3, bits: 32 };
+const POSITION: buf::Format = buf::Format::F32(3);
+const NORMAL: buf::Format = buf::Format::F32(3);
 
 const TRIANGLE_DATA: &'static [Vertex] = &[
     Vertex { position: [ -0.5, -0.5, 0.0 ], normal: [ 0.0, 0.0, 1.0 ] },
@@ -43,23 +45,6 @@ const CLEAR: gpu::framebuffer::ClearOp = gpu::framebuffer::ClearOp {
         z: -1.0,
     },
 };
-
-fn cstr<'a, T>(bytes: &'a T) -> &'a ffi::CStr
-    where T: AsRef<[u8]>
-{
-    ffi::CStr::from_bytes_with_nul(bytes.as_ref()).expect("missing NUL byte")
-}
-
-fn read_file_to_end<P>(path: P) -> io::Result<Vec<u8>>
-    where P: AsRef<path::Path>
-{
-    use io::Read;
-    let file = fs::File::open(path)?;
-    let mut reader = io::BufReader::new(file);
-    let mut contents = Vec::new();
-    let _ = reader.read_to_end(&mut contents)?;
-    Ok(contents)
-}
 
 fn main() {
     let _ = env_logger::init();
@@ -83,34 +68,27 @@ fn main() {
     let vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
     factory.initialize_buffer(&vbuf, TRIANGLE_DATA);
 
-    let position_accessor= buf::Accessor::new(vbuf.clone(), POSITION, 0, 24);
-    let normal_accessor = buf::Accessor::new(vbuf, NORMAL, 12, 24);
-    let mut vertex_array_builder = gpu::VertexArray::builder();
-    vertex_array_builder.attributes.insert(0, position_accessor);
-    vertex_array_builder.attributes.insert(1, normal_accessor);
-    let vertex_array = factory.vertex_array(vertex_array_builder);
+    let positions = buf::Accessor::new(vbuf.clone(), POSITION, 0, 24);
+    let normals = buf::Accessor::new(vbuf, NORMAL, 12, 24);
+    let attributes = [Some(positions), Some(normals), None, None, None, None, None, None];
+    let indices = None;
+    let vertex_array = factory.vertex_array(attributes, indices);
 
-        let vertex_shader = {
-        let mut source = read_file_to_end("examples/deferred/gbuffer.vert").unwrap();
+    let vertex_shader = {
+        let mut source = util::read_file_to_end("examples/deferred/gbuffer.vert").unwrap();
         source.push(0);
-        factory.program_object(
-            gpu::program::Kind::Vertex,
-            cstr(&source),
-        )
+        factory.shader(gpu::shader::Kind::Vertex, util::cstr(&source))
     };
     let fragment_shader = {
-        let mut source = read_file_to_end("examples/deferred/gbuffer.frag").unwrap();
+        let mut source = util::read_file_to_end("examples/deferred/gbuffer.frag").unwrap();
         source.push(0);
-        factory.program_object(
-            gpu::program::Kind::Fragment,
-            cstr(&source),
-        )
+        factory.shader(gpu::shader::Kind::Fragment, util::cstr(&source))
     };
-    let interface = gpu::program::Interface::default();
+    let bindings = gpu::program::Bindings::default();
     let program = factory.program(
         &vertex_shader,
         &fragment_shader,
-        &interface,
+        &bindings,
     );
 
     let draw_call = gpu::DrawCall {

@@ -1,16 +1,20 @@
 //! Vertex array objects.
 
+use buffer;
 use queue;
 use std::{cmp, fmt, hash, ops, sync};
-
-use buffer::Accessor;
-use vec_map::VecMap;
 
 /// The maximum number of vertex attributes permitted by the crate.
 pub const MAX_ATTRIBUTES: usize = 8;
 
 /// The OpenGL VAO ID type.
 pub(crate) type Id = u32;
+
+/// Vertex attribute.
+pub type Attribute = buffer::Accessor;
+
+/// Index data.
+pub type Indices = buffer::Accessor;
 
 /// Returns the VAO back to the factory upon destruction.
 struct Destructor {
@@ -31,10 +35,10 @@ pub struct VertexArray {
     id: Id,
     
     /// Draw sequence indices to bind at draw time.
-    indices: Option<Accessor>,
+    indices: Option<Indices>,
 
     /// Vertex attributes to bind at draw time.
-    attributes: VecMap<Accessor>,
+    attributes: [Option<Attribute>; MAX_ATTRIBUTES],
 
     /// Returns the VAO back to the factory upon destruction.
     destructor: sync::Arc<Destructor>,
@@ -44,13 +48,14 @@ impl VertexArray {
     /// Constructor.
     pub(crate) fn new(
         id: Id,
-        builder: Builder,
+        attributes: [Option<Attribute>; MAX_ATTRIBUTES],
+        indices: Option<Indices>,
         tx: queue::Sender<Id>,
     ) -> Self {
         Self {
             id,
-            indices: builder.indices,
-            attributes: builder.attributes,
+            indices,
+            attributes,
             destructor: sync::Arc::new(Destructor { id, tx }),
         }
     }
@@ -61,13 +66,13 @@ impl VertexArray {
     }
 
     /// Returns the accessor bound as the element array buffer.
-    pub fn indices(&self) -> Option<&Accessor> {
+    pub fn indices(&self) -> Option<&Indices> {
         self.indices.as_ref()
     }
 
     /// Returns the accessor bound to the given attribute index.
-    pub fn attribute(&self, index: u8) -> Option<&Accessor> {
-        self.attributes.get(index as usize)
+    pub fn attribute(&self, index: u8) -> Option<&Attribute> {
+        self.attributes[index as usize].as_ref()
     }
 }
 
@@ -84,13 +89,13 @@ impl fmt::Debug for VertexArray {
         #[derive(Debug)]
         struct VertexArray<'a> {
             id: u32,
-            indices: &'a Option<Accessor>,
-            attributes: &'a VecMap<Accessor>,
+            indices: Option<&'a Indices>,
+            attributes: &'a [Option<Attribute>],
         }
 
         VertexArray {
             id: self.id,
-            indices: &self.indices,
+            indices: self.indices.as_ref(),
             attributes: &self.attributes,
         }.fmt(f)
     }
@@ -99,44 +104,5 @@ impl fmt::Debug for VertexArray {
 impl hash::Hash for VertexArray {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state)
-    }
-}
-
-/// A vertex array object definition.
-#[derive(Clone, Debug, Default)]
-pub struct Builder {
-    /// Draw sequence indices to bind at draw time.
-    pub indices: Option<Accessor>,
-
-    /// Vertex attributes to bind at draw time.
-    pub attributes: VecMap<Accessor>,
-}
-
-impl VertexArray {
-    /// Begin building a new vertex array object.
-    pub fn builder() -> Builder {
-        Builder::new()
-    }
-}
-
-impl Builder {
-    /// Constructor.
-    pub fn new() -> Self {
-        Self {
-            indices: None,
-            attributes: VecMap::new(),
-        }
-    }
-
-    /// Bind an accessor to the given attribute index.
-    pub fn attribute(&mut self, id: u8, accessor: Accessor) -> &mut Self {
-        self.attributes.insert(id as usize, accessor);
-        self
-    }
-
-    /// Bind an accessor as the index draw sequence.
-    pub fn indices(&mut self, accessor: Accessor) -> &mut Self {
-        self.indices = Some(accessor);
-        self
     }
 }

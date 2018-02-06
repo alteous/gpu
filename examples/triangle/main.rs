@@ -5,15 +5,14 @@ extern crate gpu;
 mod util;
 
 use gpu::buffer as buf;
-use std::io;
-
-use gpu::program::{Bindings, SamplerBinding, UniformBlockBinding};
+use std::{io, ops, sync};
 
 use glutin::ElementState::Released;
 use glutin::Event;
 use glutin::GlContext;
 use glutin::VirtualKeyCode as Key;
 use glutin::WindowEvent;
+use gpu::program::{Bindings, SamplerBinding, UniformBlockBinding};
 
 #[repr(C)]
 struct Vertex {
@@ -23,6 +22,27 @@ struct Vertex {
 #[repr(C)]
 struct UniformBlock {
     color: [f32; 4],
+}
+
+#[derive(Clone)]
+struct Window(sync::Arc<glutin::GlWindow>);
+
+impl gpu::Context for Window {
+    fn query_proc_address(&self, symbol: &str) -> *const () {
+        use glutin::GlContext;
+        (*self.0).get_proc_address(symbol)
+    }
+
+    fn dimensions(&self) -> (u32, u32) {
+        (*self.0).get_inner_size().unwrap()
+    }
+}
+
+impl ops::Deref for Window {
+    type Target = glutin::GlWindow;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 const BINDINGS: Bindings = Bindings {
@@ -67,9 +87,8 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let (framebuffer, factory) = gpu::init(|sym| {
-        window.get_proc_address(sym) as *const _
-    });
+    let window = Window(sync::Arc::new(window));
+    let (framebuffer, factory) = gpu::init(window.clone());
 
     let vert_shader = {
         let mut source = util::read_file_to_end("examples/triangle/shader.vert")
@@ -113,14 +132,7 @@ fn main() {
     let mut running = true;
     while running {
         window.swap_buffers().unwrap();
-        let state = {
-            let (x, y) = (0, 0);
-            let (w, h) = window.get_inner_size().unwrap();
-            gpu::pipeline::State {
-                viewport: gpu::pipeline::Viewport { x, y, w, h },
-                .. Default::default()
-            }
-        };
+        let state = gpu::pipeline::State::default();
         factory.draw(&framebuffer, &state, &vertex_array, &draw_call, &invocation);
         event_loop.poll_events(|event| {
             match event {

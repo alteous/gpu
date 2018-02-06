@@ -8,7 +8,7 @@ mod util;
 use gpu::buffer as buf;
 use gpu::image as img;
 use gpu::texture as tex;
-use std::io;
+use std::{io, ops, sync};
 
 use glutin::ElementState::Released;
 use glutin::Event;
@@ -23,6 +23,27 @@ struct Vertex {
     position: [f32; 3],
     /// Offset: 12
     normal: [f32; 3],
+}
+
+#[derive(Clone)]
+struct Window(sync::Arc<glutin::GlWindow>);
+
+impl gpu::Context for Window {
+    fn query_proc_address(&self, symbol: &str) -> *const () {
+        use glutin::GlContext;
+        (*self.0).get_proc_address(symbol)
+    }
+
+    fn dimensions(&self) -> (u32, u32) {
+        (*self.0).get_inner_size().unwrap()
+    }
+}
+
+impl ops::Deref for Window {
+    type Target = glutin::GlWindow;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 const POSITION: buf::Format = buf::Format::F32(3);
@@ -61,9 +82,8 @@ fn main() {
         &event_loop,
     ).unwrap();
     unsafe { window.make_current().unwrap() }
-    let (_default_framebuffer, factory) = gpu::init(|sym| {
-        window.get_proc_address(sym) as *const _
-    });
+    let window = Window(sync::Arc::new(window));
+    let (_default_framebuffer, factory) = gpu::init(window.clone());
 
     let vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
     factory.initialize_buffer(&vbuf, TRIANGLE_DATA);
@@ -112,7 +132,7 @@ fn main() {
         gpu::framebuffer::ColorAttachment::Texture2(normal_target.clone()),
         gpu::framebuffer::ColorAttachment::None,
     ];
-    let framebuffer = factory.framebuffer(color_attachments);
+    let framebuffer = factory.framebuffer(width, height, color_attachments);
 
     let mut running = true;
     while running {
@@ -137,15 +157,7 @@ fn main() {
         });
 
         factory.clear(&framebuffer, CLEAR);
-        let state = gpu::pipeline::State {
-            viewport: gpu::pipeline::Viewport {
-                x: 0,
-                y: 0,
-                w: 1920,
-                h: 1080,
-            },
-            .. Default::default()
-        };
+        let state = gpu::pipeline::State::default();
         factory.draw(
             &framebuffer,
             &state,

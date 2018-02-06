@@ -3,7 +3,9 @@
 use std::{cmp, fmt, hash};
 
 use renderbuffer::Renderbuffer;
+use std::boxed::Box;
 use texture::Texture2;
+use Context;
 
 pub const MAX_COLOR_ATTACHMENTS: usize = 3;
 
@@ -21,10 +23,22 @@ pub enum ColorAttachment {
     None,
 }
 
+/// The framebuffer width and height.
+pub enum Dimensions {
+    /// Framebuffer dimensions are known internally by the crate.
+    Internal { width: u32, height: u32 },
+
+    /// Framebuffer dimensions must be queried from outside of the crate.
+    External { context: Box<Context> }
+}
+
 /// A framebuffer object.
 pub struct Framebuffer {
     /// The OpenGL framebuffer ID.
     id: Id,
+
+    /// The framebuffer width and height.
+    dimensions: Dimensions,
 
     /// Color attachments.
     color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
@@ -53,34 +67,44 @@ pub struct ClearOp {
 }
 
 impl Framebuffer {
-    /// Constructor.
-    ///
-    /// The caller is responsible for setting up the framebuffer.
-    pub(crate) fn new(
+    /// Constructor for an internally managed framebuffer object.
+    pub(crate) fn internal(
         id: Id,
+        width: u32,
+        height: u32,
         color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
     ) -> Self {
         Self {
             id,
+            dimensions: Dimensions::Internal { width, height },
             color_attachments,
         }
     }
 
-    /// Returns the implicit framebuffer object.
-    pub(crate) fn implicit() -> Self {
-        Self::new(
-            0,
-            [
+    /// Constructor for an externally managed framebuffer object.
+    pub(crate) fn external(context: Box<Context>) -> Self {
+        Self {
+            id: 0,
+            dimensions: Dimensions::External { context },
+            color_attachments: [
                 ColorAttachment::Renderbuffer(Renderbuffer::implicit()),
                 ColorAttachment::None,
                 ColorAttachment::None,
             ],
-        )
+        }
     }
 
     /// Returns the OpenGL framebuffer ID.
     pub(crate) fn id(&self) -> Id {
         self.id
+    }
+
+    /// Returns the width of the rendering region in pixels.
+    pub fn dimensions(&self) -> (u32, u32) {
+        match self.dimensions {
+            Dimensions::Internal { width, height } => (width, height),
+            Dimensions::External { ref context } => context.dimensions(),
+        }
     }
 }
 

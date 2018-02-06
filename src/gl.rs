@@ -10,10 +10,10 @@ pub struct Backend {
 
 impl Backend {
     /// Constructor.
-    pub fn load<F>(func: F) -> Self
-        where F: FnMut(&str) -> *const os::raw::c_void
+    pub fn load<F>(mut func: F) -> Self
+        where F: FnMut(&str) -> *const ()
     {
-        let gl = rc::Rc::new(Gl::load_with(func));
+        let gl = rc::Rc::new(Gl::load_with(|sym| func(sym) as *const _));
         Backend { gl }
     }
 
@@ -241,6 +241,53 @@ impl Backend {
         }
         self.check_error();
         id
+    }
+
+    /// Corresponds to `glBindRenderbuffer`.
+    pub fn bind_renderbuffer(&self, id: u32) {
+        trace!(target: "gl", "glBindRenderbuffer{:?} ", (RENDERBUFFER, id));
+        unsafe {
+            self.gl.BindRenderbuffer(RENDERBUFFER, id);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glRenderbufferStorage`.
+    pub fn renderbuffer_storage(&self, format: u32, width: i32, height: i32) {
+        trace!(
+            target: "gl",
+            "glBindRenderbufferStorage{:?} ",
+            (RENDERBUFFER, format, width, height),
+        );
+        unsafe {
+            self.gl.RenderbufferStorage(RENDERBUFFER, format, width, height);
+        }
+        self.check_error();
+    }
+
+    /// Corresponds to `glRenderbufferStorageMultisample`.
+    pub fn renderbuffer_storage_multisample(
+        &self,
+        samples: i32,
+        format: u32,
+        width: i32,
+        height: i32,
+    ) {
+        trace!(
+            target: "gl",
+            "glBindRenderbufferStorageMultisample{:?} ",
+            (RENDERBUFFER, samples, format, width, height),
+        );
+        unsafe {
+            self.gl.RenderbufferStorageMultisample(
+                RENDERBUFFER,
+                samples,
+                format,
+                width,
+                height,
+            );
+        }
+        self.check_error();
     }
 
     /// Corresponds to `glBindFramebuffer`.

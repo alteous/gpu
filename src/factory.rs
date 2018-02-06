@@ -7,7 +7,7 @@ use gl;
 use image;
 use program;
 use shader;
-use std::{ffi, mem, os, ptr};
+use std::{ffi, mem, ptr};
 use texture;
 use util;
 use vertex_array;
@@ -55,7 +55,7 @@ pub struct Factory {
 impl Factory {
     /// Constructor.
     pub fn new<F>(query_proc_address: F) -> Self
-        where F: FnMut(&str) -> *const os::raw::c_void
+        where F: FnMut(&str) -> *const ()
     {
         Self {
             backend: gl::Backend::load(query_proc_address),
@@ -319,14 +319,37 @@ impl Factory {
     }
 
     /// Create a renderbuffer.
-    pub fn renderbuffer(&self) -> Renderbuffer {
+    pub fn renderbuffer(
+        &self,
+        width: u32,
+        height: u32,
+        samples: u32,
+        format: texture::Format,
+    ) -> Renderbuffer {
         let id = self.backend.gen_renderbuffer();
+        self.backend.bind_renderbuffer(id);
+        if samples > 1 {
+            self.backend.renderbuffer_storage(
+                format.as_gl_enum(),
+                width as _,
+                height as _,
+            )
+        } else {
+            self.backend.renderbuffer_storage_multisample(
+                samples as _,
+                format.as_gl_enum(),
+                width as _,
+                height as _,
+            )
+        }
         Renderbuffer::new(id)
     }
 
     /// Create a framebuffer.
     pub fn framebuffer(
         &self,
+        width: u32,
+        height: u32,
         color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
     ) -> Framebuffer {
         let id = self.backend.gen_framebuffer();
@@ -352,8 +375,10 @@ impl Factory {
             }
         }
         self.backend.draw_buffers(&draw_buffers);
-        Framebuffer::new(
+        Framebuffer::internal(
             id,
+            width,
+            height,
             color_attachments,
         )
     }
@@ -368,9 +393,15 @@ impl Factory {
         invocation: &Invocation,
     ) {
         self.backend.bind_framebuffer(framebuffer.id());
-        {
-            let Viewport { x, y, w, h } = state.viewport;
-            self.backend.viewport(x, y, w, h);
+        match state.viewport {
+            Viewport::Max => {
+                let (x, y) = (0, 0);
+                let (w, h) = framebuffer.dimensions();
+                self.backend.viewport(x, y, w, h)
+            }
+            Viewport::Subset { x, y, w, h } => {
+                self.backend.viewport(x, y, w, h);
+            }
         }
         if let Some(opt) = state.culling.as_gl_enum_if_enabled() {
             self.backend.enable(gl::CULL_FACE);

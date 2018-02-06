@@ -4,6 +4,10 @@ extern crate crossbeam_channel;
 #[macro_use] extern crate log;
 extern crate vec_map;
 
+#[cfg(feature = "macros")]
+#[macro_use]
+pub mod macros;
+
 mod factory;
 mod gl;
 mod queue;
@@ -21,15 +25,24 @@ pub mod shader;
 pub mod texture;
 pub mod vertex_array;
 
-use std::os;
+use std::boxed::Box;
+
+/// Represents an OpenGL context.
+pub trait Context {
+    /// Retrieve the OpenGL function address for the given symbol.
+    fn query_proc_address(&self, symbol: &str) -> *const ();
+
+    /// Retrieve the dimensions of the context's framebuffer object.
+    fn dimensions(&self) -> (u32, u32);
+}
 
 /// Initialize the library, creating a default framebuffer to render to and
 /// a factory to instantiate library objects.
-pub fn init<F>(query_proc_address: F) -> (Framebuffer, Factory)
-    where F: FnMut(&str) -> *const os::raw::c_void
+pub fn init<T>(context: T) -> (Framebuffer, Factory)
+    where T: Context + 'static
 {
-    let factory = Factory::new(query_proc_address);
-    let framebuffer = Framebuffer::implicit();
+    let factory = Factory::new(|symbol| context.query_proc_address(symbol));
+    let framebuffer = Framebuffer::external(Box::new(context));
     (framebuffer, factory)
 }
 

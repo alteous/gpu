@@ -41,7 +41,6 @@ impl ops::Drop for ObjectDestructor {
     fn drop(&mut self) {
         let _ = self.tx.send(Destroyed::Object(self.id));
     }
-    
 }
 
 /// An unlinked component of a GLSL program, e.g. a compiled

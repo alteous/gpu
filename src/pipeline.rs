@@ -2,6 +2,15 @@
 
 use gl;
 
+/// The default pipeline states.
+pub const DEFAULT_STATE: State = State {
+    culling: Culling::Back,
+    depth_test: DepthTest::LessThan,
+    front_face: FrontFace::CounterClockwise,
+    polygon_mode: PolygonMode::Fill,
+    viewport: Viewport::Max,
+};
+
 /// Specifies the polygon rasterization method.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PolygonMode {
@@ -120,23 +129,32 @@ impl Culling {
 }
 
 /// Viewport region to render to.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Viewport {
-    /// X offset.
-    pub x: u32,
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Viewport {
+    /// Sets the viewport region to cover the whole framebuffer.
+    Max,
 
-    /// Y offset.
-    pub y: u32,
+    /// Sets the viewport region to a subset of the framebuffer.
+    Subset {
+        /// X offset.
+        x: u32,
+        /// Y offset.
+        y: u32,
+        /// Width.
+        w: u32,
+        /// Height.
+        h: u32,
+    }
+}
 
-    /// Width.
-    pub w: u32,
-
-    /// Height.
-    pub h: u32,
+impl Default for Viewport {
+    fn default() -> Self {
+        Viewport::Max
+    }
 }
 
 /// Fixed-function state parameters.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct State {
     /// Front face winding order.
     pub front_face: FrontFace,
@@ -152,4 +170,10 @@ pub struct State {
 
     /// Specifies region to render to.
     pub viewport: Viewport,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        DEFAULT_STATE
+    }
 }

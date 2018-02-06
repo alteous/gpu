@@ -240,7 +240,7 @@ pub enum Format {
 
     /// Unsigned normalized 16-bit rational.
     U16Norm(u8),
-    
+
     /// Unsigned 32-bit integer.
     U32(u8),
 
@@ -290,7 +290,7 @@ impl Format {
             Format::U16(size) => size,
             Format::U16Norm(size) => size,
             Format::U32(size) => size,
-            Format::U32Norm(size) => size,            
+            Format::U32Norm(size) => size,
         };
         match size {
             1 | 2 | 3 | 4 => size as usize,

@@ -7,12 +7,16 @@ use gl;
 pub enum Primitive {
     /// List of triangle points.
     Triangles,
+
+    /// List of line segments.
+    Lines,
 }
 
 impl Primitive {
     pub(crate) fn as_gl_enum(self) -> u32 {
         match self {
             Primitive::Triangles => gl::TRIANGLES,
+            Primitive::Lines => gl::LINES,
         }
     }
 }

@@ -25,7 +25,7 @@ pub mod shader;
 pub mod texture;
 pub mod vertex_array;
 
-use std::boxed::Box;
+use std::sync::Arc;
 
 /// Represents an OpenGL context.
 pub trait Context {
@@ -42,7 +42,7 @@ pub fn init<T>(context: T) -> (Framebuffer, Factory)
     where T: Context + 'static
 {
     let factory = Factory::new(|symbol| context.query_proc_address(symbol));
-    let framebuffer = Framebuffer::external(Box::new(context));
+    let framebuffer = factory.external_framebuffer(Arc::new(context));
     (framebuffer, factory)
 }
 
@@ -54,6 +54,9 @@ pub use buffer::Buffer;
 
 #[doc(inline)]
 pub use draw_call::DrawCall;
+
+#[doc(inline)]
+pub use draw_call::Primitive;
 
 #[doc(inline)]
 pub use factory::Factory;
@@ -77,7 +80,7 @@ pub use renderbuffer::Renderbuffer;
 pub use texture::Texture2;
 
 #[doc(inline)]
-pub use sampler::Sampler;
+pub use sampler::Sampler2;
 
 #[doc(inline)]
 pub use vertex_array::VertexArray;

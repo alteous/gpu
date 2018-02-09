@@ -4,7 +4,8 @@ use queue;
 use std::{cmp, fmt, hash, ops, sync};
 
 use buffer::Buffer;
-use sampler::Sampler;
+use sampler::Sampler2;
+use texture::Texture2;
 
 /// Specifies the maximum number of uniforms permitted by the crate.
 pub const MAX_UNIFORM_BLOCKS: usize = 4;
@@ -81,7 +82,7 @@ impl ops::Drop for ProgramDestructor {
     }
 }
 
-/// An invocation of a shader program.
+/// An invocation of a program whose bindings are known ahead of time.
 #[derive(Clone)]
 pub struct Invocation<'a> {
     /// The program to bind at draw time.
@@ -91,7 +92,7 @@ pub struct Invocation<'a> {
     pub uniforms: [Option<&'a Buffer>; MAX_UNIFORM_BLOCKS],
 
     /// Texture samplers to be bound to the program at draw time.
-    pub samplers: [Option<&'a Sampler>; MAX_SAMPLERS],
+    pub samplers: [Option<(&'a Texture2, Sampler2)>; MAX_SAMPLERS],
 }
 
 /// A compiled shader program.

@@ -110,6 +110,11 @@ impl Buffer {
         self.id
     }
 
+    /// Sets the buffer size.
+    pub(crate) fn set_size(&mut self, size: usize) {
+        self.size = size;
+    }
+
     /// Returns the buffer kind.
     pub fn kind(&self) -> Kind {
         self.kind
@@ -124,7 +129,14 @@ impl Buffer {
     pub fn usage(&self) -> Usage {
         self.usage
     }
-    
+
+    /// Returns a [`Slice`] convering the whole buffer.
+    ///
+    /// [`Slice`]: struct.Slice.html
+    pub fn as_slice(&self) -> Slice {
+        Slice::new(self, 0, self.size)
+    }
+
     /// Creates a slice into a [`Buffer`].
     ///
     /// [`Buffer`]: struct.Buffer.html

@@ -3,11 +3,13 @@
 #![allow(dead_code)]
 
 use buffer;
+use framebuffer;
 use gl;
 use image;
 use program;
+use renderbuffer;
 use shader;
-use std::{ffi, mem, ptr};
+use std::{ffi, mem, ptr, sync};
 use texture;
 use util;
 use vertex_array;
@@ -31,7 +33,17 @@ use program::{
 use pipeline::{PolygonMode, State, Viewport};
 use queue::Queue;
 use renderbuffer::Renderbuffer;
-use {Buffer, Program, Texture2, VertexArray};
+use {Buffer, Context, Program, Texture2, VertexArray};
+
+#[derive(Clone)]
+struct Queues {
+    buffer: Queue<buffer::Id>,
+    texture: Queue<texture::Id>,
+    vertex_array: Queue<vertex_array::Id>,
+    program: Queue<program::Destroyed>,
+    framebuffer: Queue<framebuffer::Id>,
+    renderbuffer: Queue<renderbuffer::Id>,
+}
 
 /// OpenGL memory manager.
 #[derive(Clone)]
@@ -39,17 +51,8 @@ pub struct Factory {
     /// Function pointers to the OpenGL backend.
     backend: gl::Backend,
 
-    /// Destroyed buffers arrive here to be destroyed or recycled.
-    buffer_queue: Queue<buffer::Id>,
-
-    /// Destroyed textures arrive here to be destroyed or recycled.
-    texture_queue: Queue<texture::Id>,
-    
-    /// Destroyed vertex arrays arrive here to be destroyed or recycled.
-    vertex_array_queue: Queue<vertex_array::Id>,
-
-    /// Destroyed GLSL programs arrive here to be destroyed or recycled.
-    program_queue: Queue<program::Destroyed>,
+    /// Destroyed OpenGL objects arrive here to be destroyed or recycled.
+    queues: Queues,
 }
 
 impl Factory {
@@ -59,10 +62,14 @@ impl Factory {
     {
         Self {
             backend: gl::Backend::load(query_proc_address),
-            buffer_queue: Queue::new(),
-            texture_queue: Queue::new(),
-            vertex_array_queue: Queue::new(),
-            program_queue: Queue::new(),
+            queues: Queues {
+                buffer: Queue::new(),
+                texture: Queue::new(),
+                vertex_array: Queue::new(),
+                program: Queue::new(),
+                framebuffer: Queue::new(),
+                renderbuffer: Queue::new(),
+            }
         }
     }
 
@@ -90,7 +97,7 @@ impl Factory {
     /// (Re)-initialize the contents of a [`Buffer`].
     ///
     /// [`Buffer`]: buffer/struct.Buffer.html
-    pub fn initialize_buffer<T>(&self, buffer: &Buffer, data: &[T]) {
+    pub fn initialize_buffer<T>(&self, buffer: &mut Buffer, data: &[T]) {
         self.backend.bind_buffer(buffer.id(), buffer.kind().as_gl_enum());
         self.backend.buffer_data(
             buffer.kind().as_gl_enum(),
@@ -99,6 +106,7 @@ impl Factory {
             buffer.usage().as_gl_enum(),
         );
         self.backend.bind_buffer(0, buffer.kind().as_gl_enum());
+        buffer.set_size(data.len() * mem::size_of::<T>());
     }
 
     /// Overwrite part of a buffer.
@@ -112,7 +120,7 @@ impl Factory {
     pub fn buffer(&self, kind: buffer::Kind, usage: buffer::Usage) -> Buffer {
         let id = self.backend.gen_buffer();
         let size = 0;
-        let tx = self.buffer_queue.tx();
+        let tx = self.queues.buffer.tx();
         Buffer::new(id, kind, size, usage, tx)
     }
 
@@ -123,7 +131,7 @@ impl Factory {
         indices: Option<vertex_array::Indices>,
     ) -> VertexArray {
         let id = self.backend.gen_vertex_array();
-        let tx = self.vertex_array_queue.tx();
+        let tx = self.queues.vertex_array.tx();
 
         // Setup the vertex array
         {
@@ -160,7 +168,7 @@ impl Factory {
         let id = self.backend.create_shader(kind.as_gl_enum());
         self.backend.shader_source(id, sources);
         self.backend.compile_shader(id);
-        let tx = self.program_queue.tx();
+        let tx = self.queues.program.tx();
         shader::Object::new(id, kind, tx)
     }
 
@@ -175,7 +183,7 @@ impl Factory {
         self.backend.attach_shader(id, vertex.id());
         self.backend.attach_shader(id, fragment.id());
         self.backend.link_program(id);
-        let tx = self.program_queue.tx();
+        let tx = self.queues.program.tx();
         let mut program = Program::new(id, tx);
         for binding in 0 .. MAX_UNIFORM_BLOCKS {
             match bindings.uniform_blocks[binding] {
@@ -251,7 +259,7 @@ impl Factory {
         format: texture::Format,
     ) -> Texture2 {
         let id = self.backend.gen_texture();
-        let tx = self.texture_queue.tx();
+        let tx = self.queues.texture.tx();
         self.backend.bind_texture(gl::TEXTURE_2D, id);
         self.backend.tex_image_2d(
             gl::TEXTURE_2D,
@@ -327,6 +335,7 @@ impl Factory {
         format: texture::Format,
     ) -> Renderbuffer {
         let id = self.backend.gen_renderbuffer();
+        let tx = self.queues.renderbuffer.tx();
         self.backend.bind_renderbuffer(id);
         if samples > 1 {
             self.backend.renderbuffer_storage(
@@ -342,7 +351,7 @@ impl Factory {
                 height as _,
             )
         }
-        Renderbuffer::new(id)
+        Renderbuffer::new(id, tx)
     }
 
     /// Create a framebuffer.
@@ -353,6 +362,7 @@ impl Factory {
         color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
     ) -> Framebuffer {
         let id = self.backend.gen_framebuffer();
+        let tx = self.queues.framebuffer.tx();
         self.backend.bind_framebuffer(id);
         let mut draw_buffers = vec![];
         for attachment in 0 .. MAX_COLOR_ATTACHMENTS {
@@ -377,13 +387,24 @@ impl Factory {
         self.backend.draw_buffers(&draw_buffers);
         Framebuffer::internal(
             id,
+            tx,
             width,
             height,
             color_attachments,
         )
     }
 
-    /// Perform a draw call.
+    /// Create the external framebuffer.
+    pub(crate) fn external_framebuffer(
+        &self,
+        context: sync::Arc<Context>,
+    ) -> Framebuffer {
+        let tx = self.queues.framebuffer.tx();
+        let rbuf = Renderbuffer::implicit(self.queues.renderbuffer.tx());
+        Framebuffer::external(context, tx, rbuf)
+    }
+
+    /// Perform a static draw call.
     pub fn draw(
         &self,
         framebuffer: &Framebuffer,
@@ -424,8 +445,8 @@ impl Factory {
             });
         }
         for (idx, opt) in invocation.samplers.iter().enumerate() {
-            opt.map(|sampler| {
-                let (id, ty) = (sampler.id(), sampler.ty());
+            opt.map(|(texture, sampler)| {
+                let (id, ty) = (texture.id(), gl::TEXTURE_2D);
                 self.backend.active_texture(idx as u32);
                 self.backend.bind_texture(ty, id);
                 self.backend.tex_parameteri(

@@ -32,6 +32,9 @@ pub enum UniformBlockBinding {
     /// Binding point is required by the program to function correctly.
     Required(&'static [u8]),
 
+    /// Binding point is optional.
+    Optional(&'static [u8]),
+
     /// Binding point is unassigned.
     None,
 }
@@ -47,6 +50,9 @@ impl Default for UniformBlockBinding {
 pub enum SamplerBinding {
     /// Binding point is required by the program to function correctly.
     Required(&'static [u8]),
+
+    /// Binding point is optional.
+    Optional(&'static [u8]),
 
     /// Binding point is unassigned.
     None,

@@ -198,6 +198,18 @@ impl Factory {
                         binding as u32,
                     );
                 }
+                UniformBlockBinding::Optional(name) => {
+                    let cstr = util::cstr(name);
+                    if let Some(index) = {
+                        self.query_uniform_block_index(&program, cstr)
+                    } {
+                        self.set_uniform_block_binding(
+                            &program,
+                            index,
+                            binding as u32,
+                        );
+                    }
+                }
                 UniformBlockBinding::None => {}
             }
         }
@@ -209,6 +221,14 @@ impl Factory {
                         .query_uniform_index(&program, cstr)
                         .expect("missing required sampler index");
                     program.samplers[binding] = Some(index);
+                }
+                SamplerBinding::Optional(name) => {
+                    let cstr = util::cstr(name);
+                    if let Some(index) = {
+                        self.query_uniform_index(&program, cstr)
+                    } {
+                        program.samplers[binding] = Some(index);
+                    }
                 }
                 SamplerBinding::None => {}
             }
@@ -446,29 +466,32 @@ impl Factory {
         }
         for (idx, opt) in invocation.samplers.iter().enumerate() {
             opt.map(|(texture, sampler)| {
-                let (id, ty) = (texture.id(), gl::TEXTURE_2D);
-                self.backend.active_texture(idx as u32);
-                self.backend.bind_texture(ty, id);
-                self.backend.tex_parameteri(
-                    ty,
-                    gl::TEXTURE_MAG_FILTER,
-                    sampler.mag_filter.as_gl_enum(),
-                );
-                self.backend.tex_parameteri(
-                    ty,
-                    gl::TEXTURE_MIN_FILTER,
-                    sampler.min_filter.as_gl_enum(),
-                );
-                self.backend.tex_parameteri(
-                    ty,
-                    gl::TEXTURE_WRAP_S,
-                    sampler.wrap_s.as_gl_enum(),
-                );
-                self.backend.tex_parameteri(
-                    ty,
-                    gl::TEXTURE_WRAP_T,
-                    sampler.wrap_t.as_gl_enum(),
-                );
+                if let Some(location) = invocation.program.samplers[idx] {
+                    let (id, ty) = (texture.id(), gl::TEXTURE_2D);
+                    self.backend.active_texture(idx as u32);
+                    self.backend.bind_texture(ty, id);
+                    self.backend.tex_parameteri(
+                        ty,
+                        gl::TEXTURE_MAG_FILTER,
+                        sampler.mag_filter.as_gl_enum(),
+                    );
+                    self.backend.tex_parameteri(
+                        ty,
+                        gl::TEXTURE_MIN_FILTER,
+                        sampler.min_filter.as_gl_enum(),
+                    );
+                    self.backend.tex_parameteri(
+                        ty,
+                        gl::TEXTURE_WRAP_S,
+                        sampler.wrap_s.as_gl_enum(),
+                    );
+                    self.backend.tex_parameteri(
+                        ty,
+                        gl::TEXTURE_WRAP_T,
+                        sampler.wrap_t.as_gl_enum(),
+                    );
+                    self.backend.uniform_1i(location as i32, idx as i32);
+                }
             });
         }
         self.backend.polygon_mode(gl::FRONT_AND_BACK, state.polygon_mode.as_gl_enum());

@@ -103,11 +103,11 @@ fn main() {
         factory.shader(gpu::shader::Kind::Fragment, util::cstr(&source))
     };
     let program = factory.program(&vert_shader, &frag_shader, &BINDINGS);
-    let ubuf = factory.buffer(buf::Kind::Uniform, buf::Usage::DynamicDraw);
-    factory.initialize_buffer(&ubuf, YELLOW);
+    let mut ubuf = factory.buffer(buf::Kind::Uniform, buf::Usage::DynamicDraw);
+    factory.initialize_buffer(&mut ubuf, YELLOW);
 
-    let vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
-    factory.initialize_buffer(&vbuf, TRIANGLE_VERTICES);
+    let mut vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
+    factory.initialize_buffer(&mut vbuf, TRIANGLE_VERTICES);
     let positions = buf::Accessor::new(vbuf, buf::Format::F32(3), 0, 0);
     let attributes = [Some(positions), None, None, None, None, None, None, None];
     let indices = None;
@@ -115,7 +115,7 @@ fn main() {
 
     let tex = factory.texture2(1, 1, true, gpu::texture::Format::Rgba8);
     factory.write_texture2(&tex, gpu::image::U8::Rgba, GREEN_PIXEL);
-    let sampler = gpu::Sampler::from_texture2(tex);
+    let sampler = gpu::Sampler2::default();
 
     let draw_call = gpu::DrawCall {
         kind: gpu::draw_call::Kind::Arrays,
@@ -126,7 +126,7 @@ fn main() {
     let invocation = gpu::program::Invocation {
         program: &program,
         uniforms: [Some(&ubuf), None, None, None],
-        samplers: [Some(&sampler), None, None, None],
+        samplers: [Some((&tex, sampler)), None, None, None],
     };
 
     let mut running = true;

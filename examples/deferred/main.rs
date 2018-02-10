@@ -85,8 +85,8 @@ fn main() {
     let window = Window(sync::Arc::new(window));
     let (_default_framebuffer, factory) = gpu::init(window.clone());
 
-    let vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
-    factory.initialize_buffer(&vbuf, TRIANGLE_DATA);
+    let mut vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
+    factory.initialize_buffer(&mut vbuf, TRIANGLE_DATA);
 
     let positions = buf::Accessor::new(vbuf.clone(), POSITION, 0, 24);
     let normals = buf::Accessor::new(vbuf, NORMAL, 12, 24);

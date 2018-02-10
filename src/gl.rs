@@ -461,6 +461,19 @@ impl Backend {
         self.check_error();
     }
 
+    /// Corresponds to `glUniform1i`.
+    pub fn uniform_1i(
+        &self,
+        location: i32,
+        value: i32,
+    ) {
+        trace!(target: "gl", "glUniform1i{:?} ", (location, value));
+        unsafe {
+            self.gl.Uniform1i(location, value);
+        }
+        self.check_error();
+    }
+
     /// Corresponds to `glGetUniformLocation`.
     pub fn get_uniform_location(
         &self,

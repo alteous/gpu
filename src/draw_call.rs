@@ -5,18 +5,32 @@ use gl;
 /// Primitive topology.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Primitive {
-    /// List of triangle points.
+    /// `[(v0, v1, v2), (v0, v1, v2), ...]`.
     Triangles,
 
-    /// List of line segments.
+    /// * For odd n, vertices n, n + 1, and n + 2 define triangle n.
+    /// * For even n, vertices n + 1, n, and n + 2 define triangle n.
+    /// * In total, n - 2 triangles are drawn.
+    TriangleStrip,
+
+    /// `[(start, end), (start, end), ...]`.
     Lines,
+
+    /// `[start, end/start, ..., end/start, end]`.
+    LineStrip,
+
+    /// `[start, end/start, ..., end/start, end; <implicit_start>]`.
+    LineLoop,
 }
 
 impl Primitive {
     pub(crate) fn as_gl_enum(self) -> u32 {
         match self {
             Primitive::Triangles => gl::TRIANGLES,
+            Primitive::TriangleStrip => gl::TRIANGLE_STRIP,
             Primitive::Lines => gl::LINES,
+            Primitive::LineStrip => gl::LINE_STRIP,
+            Primitive::LineLoop => gl::LINE_LOOP,
         }
     }
 }

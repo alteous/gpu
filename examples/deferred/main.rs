@@ -171,7 +171,7 @@ fn main() {
     let mut buffer = vec![0u8; 1920 * 1080 * 3];
     factory.read_texture2(
         &normal_target,
-        img::U8::Rgb,
+        img::format::U8::Rgb,
         &mut buffer,
     );
     image::save_buffer(

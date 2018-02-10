@@ -114,7 +114,7 @@ fn main() {
     let vertex_array = factory.vertex_array(attributes, indices);
 
     let tex = factory.texture2(1, 1, true, gpu::texture::Format::Rgba8);
-    factory.write_texture2(&tex, gpu::image::U8::Rgba, GREEN_PIXEL);
+    factory.write_texture2(&tex, gpu::image::format::U8::Rgba, GREEN_PIXEL);
     let sampler = gpu::Sampler2::default();
 
     let draw_call = gpu::DrawCall {

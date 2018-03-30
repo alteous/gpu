@@ -14,12 +14,29 @@ pub(crate) type Id = u32;
 /// Framebuffer color attachment.
 #[derive(Clone, Debug)]
 pub enum ColorAttachment {
+    /// Render to renderbuffer.
     Renderbuffer(Renderbuffer),
 
     /// Render to 2D texture.
     Texture2(Texture2),
 
     /// No color attachment.
+    None,
+}
+
+/// Framebuffer depth/stencil attachment.
+#[derive(Clone, Debug)]
+pub enum DepthStencilAttachment {
+    /// Use a 2D texture as the depth attachment.
+    DepthOnly(Texture2),
+
+    /// Use a 2D texture as the stencil attachment.
+    StencilOnly(Texture2),
+
+    /// Use a 2D texture as both the depth and stencil attachment.
+    Both(Texture2),
+
+    /// No depth nor stencil attachment.
     None,
 }
 
@@ -44,6 +61,16 @@ impl ops::Drop for Destructor {
     }
 }
 
+/// Framebuffer attachments.
+#[derive(Clone)]
+enum Attachments {
+    External,
+    Internal {
+        color: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+        depth_stencil: DepthStencilAttachment, 
+    },
+}
+
 /// A framebuffer object.
 #[derive(Clone)]
 pub struct Framebuffer {
@@ -56,8 +83,8 @@ pub struct Framebuffer {
     /// The framebuffer width and height.
     dimensions: Dimensions,
 
-    /// Color attachments.
-    color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+    /// Framebuffer attachments.
+    attachments: Attachments,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -89,13 +116,14 @@ impl Framebuffer {
         tx: queue::Sender<Id>,
         width: u32,
         height: u32,
-        color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+        color: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+        depth_stencil: DepthStencilAttachment,
     ) -> Self {
         Self {
             id,
             destructor: sync::Arc::new(Destructor { id, tx }),
             dimensions: Dimensions::Internal { width, height },
-            color_attachments,
+            attachments: Attachments::Internal { color, depth_stencil },
         }
     }
 
@@ -103,23 +131,24 @@ impl Framebuffer {
     pub(crate) fn external(
         context: sync::Arc<Context>,
         tx: queue::Sender<Id>,
-        renderbuffer: Renderbuffer,
     ) -> Self {
         Self {
             id: 0,
             destructor: sync::Arc::new(Destructor { id: 0, tx }),
             dimensions: Dimensions::External { context },
-            color_attachments: [
-                ColorAttachment::Renderbuffer(renderbuffer),
-                ColorAttachment::None,
-                ColorAttachment::None,
-            ],
+            attachments: Attachments::External,
         }
     }
 
     /// Returns the OpenGL framebuffer ID.
     pub(crate) fn id(&self) -> Id {
         self.id
+    }
+
+    /// Returns the aspect ratio of the rendering region.
+    pub fn aspect_ratio(&self) -> f32 {
+        let (width, height) = self.dimensions();
+        width as f32 / height as f32
     }
 
     /// Returns the width of the rendering region in pixels.
@@ -134,14 +163,12 @@ impl Framebuffer {
 impl fmt::Debug for Framebuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[derive(Debug)]
-        struct Framebuffer<'a> {
+        struct Framebuffer {
             id: Id,
-            color_attachments: &'a [ColorAttachment],
         }
 
         Framebuffer {
             id: self.id,
-            color_attachments: &self.color_attachments,
         }.fmt(f)
     }
 }

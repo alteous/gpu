@@ -7,30 +7,64 @@ use std::{cmp, fmt, hash, ops, sync};
 /// OpenGL texture ID type.
 pub(crate) type Id = u32;
 
+/// Texture format descriptors.
+pub mod format {
+    /// 32-bit float format.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub enum F32 {
+        /// Corresponds to `GL_DEPTH_COMPONENT32F`.
+        Depth,
+
+        /// Corresponds to `GL_RGB32F`.
+        Rgb,
+
+        /// Corresponds to `GL_RGBA32F`.
+        Rgba,
+    }
+
+    /// 8-bit fixed format.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub enum U8 {
+        /// Corresponds to `GL_RGB8`.
+        Rgb,
+
+        /// Correponds to `GL_RGBA8`.
+        Rgba,
+    }
+}
+
 /// Format of texture data.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Format {
-    /// Corresponds to `GL_RGB32F`.
-    Rgb32f,
+    /// 32-bit float.
+    F32(format::F32),
 
-    /// Corresponds to `GL_RGBA32F`.
-    Rgba32f,
-
-    /// Corresponds to `GL_RGB8`.
-    Rgb8,
-
-    /// Corresponds to `GL_RGBA8`.
-    Rgba8,
+    /// 8-bit fixed.
+    U8(format::U8),
 }
 
 impl Format {
     pub(crate) fn as_gl_enum(&self) -> u32 {
         match *self {
-            Format::Rgb32f => gl::RGB32F,
-            Format::Rgba32f => gl::RGBA32F,
-            Format::Rgb8 => gl::RGB8,
-            Format::Rgba8 => gl::RGBA8,
+            Format::F32(format::F32::Depth) => gl::DEPTH_COMPONENT32F,
+            Format::F32(format::F32::Rgb) => gl::RGB32F,
+            Format::F32(format::F32::Rgba) => gl::RGBA32F,
+
+            Format::U8(format::U8::Rgb) => gl::RGB8,
+            Format::U8(format::U8::Rgba) => gl::RGBA8,
         }
+    }
+}
+
+impl From<format::F32> for Format {
+    fn from(format: format::F32) -> Self {
+        Format::F32(format)
+    }
+}
+
+impl From<format::U8> for Format {
+    fn from(format: format::U8) -> Self {
+        Format::U8(format)
     }
 }
 
@@ -64,20 +98,20 @@ pub struct Texture2 {
 }
 
 impl Texture2 {
-    pub(crate) fn new(
+    pub(crate) fn new<F: Into<Format>>(
         id: Id,
         width: u32,
         height: u32,
         mipmap: bool,
-        format: Format,
+        format: F,
         tx: queue::Sender<Id>,
     ) -> Self {
         Texture2 {
             id,
             width,
             height,
-            format,
             mipmap,
+            format: format.into(),
             _destructor: sync::Arc::new(Destructor { id, tx }),
         }
     }

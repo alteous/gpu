@@ -135,7 +135,7 @@ impl Buffer {
 
     /// Returns a [`Slice`] convering the whole buffer.
     ///
-    /// [`Slice`]: struct.Slice.html
+    /// [`Slice`]: buffer/struct.Slice.html
     pub fn as_slice(&self) -> Slice {
         Slice::new(self, 0, self.size)
     }
@@ -243,15 +243,15 @@ pub struct Accessor {
 
 impl Accessor {
     /// Constructor.
-    pub fn new(
+    pub fn new<F: Into<Format>>(
         buffer: Buffer,
-        format: Format,
+        format: F,
         offset: usize,
         stride: usize,
     ) -> Self {
         Self {
             buffer,
-            format,
+            format: format.into(),
             offset,
             stride,
         }

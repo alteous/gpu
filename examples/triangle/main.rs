@@ -4,7 +4,7 @@ extern crate gpu;
 
 mod util;
 
-use gpu::buffer as buf;
+use gpu::{buffer as buf, image as img, texture as tex};
 use std::{io, ops, sync};
 
 use glutin::ElementState::Released;
@@ -70,8 +70,6 @@ const YELLOW: &'static [UniformBlock] = &[
     UniformBlock { color: [1.0, 1.0, 1.0, 1.0] },
 ];
 
-const GREEN_PIXEL: &'static [u8] = &[0, 255, 0, 0];
-
 fn main() {
     let _ = env_logger::init();
     
@@ -88,7 +86,7 @@ fn main() {
     ).unwrap();
     unsafe { window.make_current().unwrap() }
     let window = Window(sync::Arc::new(window));
-    let (framebuffer, factory) = gpu::init(window.clone());
+    let (fbuf, factory) = gpu::init(window.clone());
 
     let vert_shader = {
         let mut source = util::read_file_to_end("examples/triangle/shader.vert")
@@ -103,20 +101,21 @@ fn main() {
         factory.shader(gpu::shader::Kind::Fragment, util::cstr(&source))
     };
     let program = factory.program(&vert_shader, &frag_shader, &BINDINGS);
-    let mut ubuf = factory.buffer(buf::Kind::Uniform, buf::Usage::DynamicDraw);
+    let mut ubuf = factory.empty_buffer(buf::Kind::Uniform, buf::Usage::DynamicDraw);
     factory.initialize_buffer(&mut ubuf, YELLOW);
 
-    let mut vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
+    let mut vbuf = factory.empty_buffer(buf::Kind::Array, buf::Usage::StaticDraw);
     factory.initialize_buffer(&mut vbuf, TRIANGLE_VERTICES);
-    let positions = buf::Accessor::new(vbuf, buf::Format::F32(3), 0, 0);
+    let positions = buf::Accessor::new(vbuf, buf::format::F32(3), 0, 0);
     let attributes = [Some(positions), None, None, None, None, None, None, None];
     let indices = None;
     let vertex_array = factory.vertex_array(attributes, indices);
 
-    let tex = factory.texture2(1, 1, true, gpu::texture::Format::Rgba8);
-    factory.write_texture2(&tex, gpu::image::format::U8::Rgba, GREEN_PIXEL);
+    let tex = factory.texture2(1, 1, true, tex::format::U8::Rgba);
+    factory.write_texture2(&tex, img::format::U8::Rgba, &[255, 255, 0, 0]);
     let sampler = gpu::Sampler2::default();
 
+    let state = gpu::pipeline::State::default();
     let draw_call = gpu::DrawCall {
         kind: gpu::draw_call::Kind::Arrays,
         primitive: gpu::draw_call::Primitive::Triangles,
@@ -131,9 +130,6 @@ fn main() {
 
     let mut running = true;
     while running {
-        window.swap_buffers().unwrap();
-        let state = gpu::pipeline::State::default();
-        factory.draw(&framebuffer, &state, &vertex_array, &draw_call, &invocation);
         event_loop.poll_events(|event| {
             match event {
                 Event::WindowEvent { event, .. } => {
@@ -153,5 +149,7 @@ fn main() {
                 _ => {}
             }
         });
+        factory.draw(&fbuf, &state, &vertex_array, &draw_call, &invocation);
+        window.swap_buffers().unwrap();
     }
 }

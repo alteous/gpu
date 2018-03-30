@@ -300,14 +300,14 @@ impl Backend {
     }
 
     /// Corresponds to `glFramebufferTexture2D`.
-    pub fn framebuffer_texture2d(&self, attachment: u32, texture: u32) {
+    pub fn framebuffer_texture(&self, attachment: u32, ty: u32, texture: u32) {
         trace!(
             target: "gl",
-            "glFramebufferTexture2D{:?}",
+            "glFramebufferTexture{:?}",
             (
                 FRAMEBUFFER,
-                COLOR_ATTACHMENT0 + attachment,
-                TEXTURE_2D,
+                attachment,
+                ty,
                 texture,
                 0,
             ),
@@ -315,8 +315,8 @@ impl Backend {
         unsafe {
             self.gl.FramebufferTexture2D(
                 FRAMEBUFFER,
-                COLOR_ATTACHMENT0 + attachment,
-                TEXTURE_2D,
+                attachment,
+                ty,
                 texture,
                 0,
             );

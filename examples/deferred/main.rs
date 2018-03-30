@@ -85,7 +85,7 @@ fn main() {
     let window = Window(sync::Arc::new(window));
     let (_default_framebuffer, factory) = gpu::init(window.clone());
 
-    let mut vbuf = factory.buffer(buf::Kind::Array, buf::Usage::StaticDraw);
+    let mut vbuf = factory.empty_buffer(buf::Kind::Array, buf::Usage::StaticDraw);
     factory.initialize_buffer(&mut vbuf, TRIANGLE_DATA);
 
     let positions = buf::Accessor::new(vbuf.clone(), POSITION, 0, 24);
@@ -123,16 +123,25 @@ fn main() {
         samplers: [None; gpu::program::MAX_SAMPLERS],
     };
     let (width, height) = (1920, 1080);
-    let format = tex::Format::Rgb32f;
+    let format = tex::format::F32::Rgb;
     let position_target = factory.texture2(width, height, false, format);
-    let format = tex::Format::Rgb8;
+    let format = tex::format::U8::Rgb;
     let normal_target = factory.texture2(width, height, false, format);
     let color_attachments = [
         gpu::framebuffer::ColorAttachment::Texture2(position_target.clone()),
         gpu::framebuffer::ColorAttachment::Texture2(normal_target.clone()),
         gpu::framebuffer::ColorAttachment::None,
     ];
-    let framebuffer = factory.framebuffer(width, height, color_attachments);
+    let format = tex::format::F32::Depth;
+    let depth_target = factory.texture2(width, height, false, format);
+    let depth_stencil_attachment =
+        gpu::framebuffer::DepthStencilAttachment::DepthOnly(depth_target);
+    let framebuffer = factory.framebuffer(
+        width,
+        height,
+        color_attachments,
+        depth_stencil_attachment,
+    );
 
     let mut running = true;
     while running {

@@ -32,14 +32,6 @@ impl Renderbuffer {
         }
     }
 
-    /// Returns the implicit renderbuffer object.
-    pub(crate) fn implicit(tx: queue::Sender<Id>) -> Self {
-        Self {
-            id: 0,
-            destructor: sync::Arc::new(Destructor { id: 0, tx }),
-        }
-    }
-
     /// Returns the OpenGL renderbuffer ID.
     pub(crate) fn id(&self) -> Id {
         self.id

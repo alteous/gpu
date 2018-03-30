@@ -20,7 +20,19 @@ macro_rules! offset_of {
     ($ty:ident::$field:ident) => {
         {
             let zero = 0 as *const $ty;
-            let offset = unsafe { &(*zero).$field as *const _ };
+            let offset = unsafe {
+                &(*zero).$field as *const _
+            };
+            offset as usize
+        }
+    };
+
+    ($ty:ident::$field:ident[$index:expr]) => {
+        {
+            let zero = 0 as *const $ty;
+            let offset = unsafe { 
+                &(*zero).$field[$index] as *const _
+            };
             offset as usize
         }
     };

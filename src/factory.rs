@@ -17,6 +17,7 @@ use vertex_array;
 use draw_call::{DrawCall, Kind};
 use framebuffer::{
     ColorAttachment,
+    DepthStencilAttachment,
     ClearOp,
     ClearColor,
     ClearDepth,
@@ -116,8 +117,32 @@ impl Factory {
         self.backend.bind_buffer(0, slice.kind().as_gl_enum());
     }
 
-    /// Create an uninitialized GPU buffer.
-    pub fn buffer(&self, kind: buffer::Kind, usage: buffer::Usage) -> Buffer {
+    /// Create an GPU buffer with `size` bytes of uninitialized memory.
+    pub fn uninitialized_buffer(
+        &self,
+        size: usize,
+        kind: buffer::Kind,
+        usage: buffer::Usage,
+    ) -> Buffer {
+        let mut buf = self.empty_buffer(kind, usage);
+        self.backend.bind_buffer(buf.id(), kind.as_gl_enum());
+        self.backend.buffer_data(
+            kind.as_gl_enum(),
+            size,
+            ptr::null() as *const (),
+            usage.as_gl_enum(),
+        );
+        self.backend.bind_buffer(0, kind.as_gl_enum());
+        buf.set_size(size);
+        buf
+    }
+
+    /// Create an empty GPU buffer.
+    pub fn empty_buffer(
+        &self,
+        kind: buffer::Kind,
+        usage: buffer::Usage,
+    ) -> Buffer {
         let id = self.backend.gen_buffer();
         let size = 0;
         let tx = self.queues.buffer.tx();
@@ -271,15 +296,16 @@ impl Factory {
     }
 
     /// Create a 2D texture backed by uninitialized GPU memory.
-    pub fn texture2(
+    pub fn texture2<F: Into<texture::Format>>(
         &self,
         width: u32,
         height: u32,
         mipmap: bool,
-        format: texture::Format,
+        format: F,
     ) -> Texture2 {
         let id = self.backend.gen_texture();
         let tx = self.queues.texture.tx();
+        let format = format.into();
         self.backend.bind_texture(gl::TEXTURE_2D, id);
         self.backend.tex_image_2d(
             gl::TEXTURE_2D,
@@ -380,6 +406,7 @@ impl Factory {
         width: u32,
         height: u32,
         color_attachments: [ColorAttachment; MAX_COLOR_ATTACHMENTS],
+        depth_stencil_attachment: DepthStencilAttachment,
     ) -> Framebuffer {
         let id = self.backend.gen_framebuffer();
         let tx = self.queues.framebuffer.tx();
@@ -390,19 +417,31 @@ impl Factory {
                 ColorAttachment::Renderbuffer(ref renderbuffer) => {
                     draw_buffers.push(gl::COLOR_ATTACHMENT0 + attachment as u32);
                     self.backend.framebuffer_renderbuffer(
-                        attachment as u32,
+                        gl::COLOR_ATTACHMENT0 + attachment as u32,
                         renderbuffer.id(),
                     )
                 }
                 ColorAttachment::Texture2(ref texture2) => {
                     draw_buffers.push(gl::COLOR_ATTACHMENT0 + attachment as u32);
-                    self.backend.framebuffer_texture2d(
-                        attachment as u32,
+                    self.backend.framebuffer_texture(
+                        gl::COLOR_ATTACHMENT0 + attachment as u32,
+                        gl::TEXTURE_2D,
                         texture2.id(),
                     )
                 }
                 ColorAttachment::None => {}
             }
+        }
+        match depth_stencil_attachment {
+            DepthStencilAttachment::DepthOnly(ref texture2) => {
+                self.backend.framebuffer_texture(
+                    gl::DEPTH_ATTACHMENT,
+                    gl::TEXTURE_2D,
+                    texture2.id(),
+                );
+            },
+            DepthStencilAttachment::None => {},
+            _ => unimplemented!(),
         }
         self.backend.draw_buffers(&draw_buffers);
         Framebuffer::internal(
@@ -411,6 +450,7 @@ impl Factory {
             width,
             height,
             color_attachments,
+            depth_stencil_attachment,
         )
     }
 
@@ -420,8 +460,7 @@ impl Factory {
         context: sync::Arc<Context>,
     ) -> Framebuffer {
         let tx = self.queues.framebuffer.tx();
-        let rbuf = Renderbuffer::implicit(self.queues.renderbuffer.tx());
-        Framebuffer::external(context, tx, rbuf)
+        Framebuffer::external(context, tx)
     }
 
     /// Perform a static draw call.
